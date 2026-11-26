@@ -119,3 +119,15 @@ img{max-width:100%}
  .fb{width:290px;padding:24px}
  .home-box{padding:24px}
 }
+
+/* Prévia dentro do celular de exemplo (página inicial do SaaS): foto primeiro, sem botões flutuantes */
+body.embed{overflow:hidden;padding-top:38px;background:var(--bg)}
+body.embed .top{position:static}
+body.embed .wa-float,body.embed .marquee{display:none}
+body.embed .hero{flex-direction:column-reverse;align-items:flex-start;padding:28px 24px 40px;gap:30px}
+body.embed .hero-media{width:100%;flex:0 0 auto}
+body.embed .hero-photo{width:250px}
+body.embed .hero-text{flex:0 0 auto;gap:18px}
+body.embed .h1{font-size:3.1rem}
+body.embed .lead{font-size:17px}
+body.embed .rise{animation-delay:0s !important}

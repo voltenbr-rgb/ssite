@@ -224,7 +224,7 @@ ${svc.length ? `<label>Serviço<select name="service">${svc.map((x) => `<option>
 </div>`;
 }
 
-export function renderPage(tenant, config, { preview = false, offline = false } = {}) {
+export function renderPage(tenant, config, { preview = false, offline = false, embed = false } = {}) {
   const c = config || {};
   const t = c.theme || {};
   const name = c.brand?.name || tenant.business_name;
@@ -278,7 +278,7 @@ ${preview ? '<meta name="robots" content="noindex">' : ''}
 <link rel="stylesheet" href="/static/page2.css">
 <style>:root{--accent:${color(t.accent, '#D45AE8')};--accent2:${color(t.accent2, '#E58BF2')};--bg:${color(t.bg, '#0F0A10')};--cream:${color(t.cream, '#F3E9C6')}}</style>
 </head>
-<body>
+<body${embed ? ' class="embed"' : ''}>
 ${body}
 <script>window.__SS=${json}</script>
 <script src="/static/page.js" defer></script>

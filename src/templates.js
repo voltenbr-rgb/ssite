@@ -3,7 +3,7 @@ import { e } from './render.js';
 
 const money = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const shell = (title, bodyHtml, { scripts = '', desc = '' } = {}) => `<!doctype html>
+const shell = (title, bodyHtml, { scripts = '', desc = '', headExtra = '' } = {}) => `<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -15,6 +15,8 @@ ${desc ? `<meta name="description" content="${e(desc)}">` : ''}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="/favicon.ico">
+${headExtra}
 </head>
 <body>
 ${bodyHtml}
@@ -33,101 +35,122 @@ const I = {
   link: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>',
 };
 
-export function landingPage({ brand, plans, trialDays, demo }) {
+export function landingPage({ brand, trialDays, demo }) {
+  const year = new Date().getFullYear();
   const features = [
     [I.edit, 'Edite sozinha, pelo celular', 'Troque textos, cores, fotos, vídeos, serviços e preços em minutos, vendo a prévia ao vivo.'],
     [I.cal, 'Agendamento que chega pronto', 'A cliente escolhe serviço, data e horário. Você recebe no painel e no WhatsApp.'],
     [I.chart, 'Métricas de verdade', 'Veja visitas, cliques no WhatsApp, serviços mais procurados e agendamentos por dia.'],
-    [I.phone, 'Linda no celular', 'Carrosséis animados, fotos que ampliam e vídeos leves, feitos para quem chega pelo Instagram.'],
+    [I.phone, 'Linda no celular e no computador', 'Carrosséis animados, fotos que ampliam e vídeos leves, feitos para quem chega pelo Instagram.'],
     [I.link, 'Seu endereço próprio', 'Seu nome no link: seunegocio.' + brand + '.com.br, pronto para a bio do Instagram.'],
     [I.chat, 'Feito para o seu segmento', 'Studios de cílios, unhas, sobrancelhas, cabelo, barbearias, estética e mais.'],
   ];
-  const plan = (p, featured) => `
-<article class="plan${featured ? ' plan-hot' : ''}">
-${featured ? '<span class="plan-tag">Mais econômico</span>' : ''}
-<h3>${e(p.name)}</h3>
-<p class="price"><strong>${money(p.price)}</strong><span>/${e(p.period)}</span></p>
-<p class="plan-note">${e(p.note)}</p>
-<ul>
-<li>${I.check} Página profissional completa</li>
-<li>${I.check} Agendamentos ilimitados</li>
-<li>${I.check} Painel com métricas</li>
-<li>${I.check} Fotos e vídeos no carrossel</li>
-<li>${I.check} Endereço com o seu nome</li>
-</ul>
-<a href="/cadastro?plano=${e(p.id)}" class="btn ${featured ? 'btn-main' : 'btn-line'} btn-block">Testar ${trialDays} dias grátis</a>
-</article>`;
+  const included = ['Página profissional completa', 'Agendamentos ilimitados', 'Painel com métricas', 'Fotos e vídeos em carrosséis', 'Endereço com o seu nome', 'App do painel no celular e no computador'];
   return shell(`${brand} · Seu site com agendamento em minutos`, `
 <header class="topbar"><div class="wrap topbar-in">${logo(brand)}
-<nav class="topnav"><a href="#recursos">Recursos</a><a href="#planos">Planos</a><a href="/entrar" class="btn btn-line btn-sm">Entrar</a></nav></div></header>
+<nav class="topnav"><a href="#recursos">Recursos</a><a href="#exemplo">Exemplo</a><a href="/entrar" class="btn btn-line btn-sm">Entrar</a></nav></div></header>
 <main>
 <section class="wrap hero">
 <div class="hero-copy">
 <p class="kicker">Para profissionais da beleza e serviços</p>
 <h1>Seu site lindo, com <span class="hl">agendamento</span> e métricas. Sem depender de ninguém.</h1>
 <p class="lead">Monte sua página em minutos, mostre seus trabalhos em carrosséis animados e receba agendamentos direto no WhatsApp.</p>
-<div class="row"><a href="/cadastro" class="btn btn-main btn-lg">Começar grátis por ${trialDays} dias</a><a href="${e(demo)}" class="btn btn-line btn-lg" target="_blank" rel="noopener">Ver exemplo real</a></div>
-<p class="fine">Sem cartão de crédito para testar.</p>
+<div class="row"><a href="/cadastro" class="btn btn-main btn-lg">Começar grátis</a><a href="${e(demo)}" class="btn btn-line btn-lg" target="_blank" rel="noopener">Ver exemplo real</a></div>
+<p class="fine">Sem cartão de crédito. Pronto em 2 minutos.</p>
 </div>
-<div class="hero-phone" aria-hidden="true">
-<div class="phone"><iframe src="${e(demo)}" title="Exemplo" loading="lazy" tabindex="-1"></iframe></div>
+<div class="hero-phone" id="exemplo">
+<a class="device" href="${e(demo)}" target="_blank" rel="noopener" aria-label="Abrir a página de exemplo da Vitória Carvalho">
+<span class="device-btn b1" aria-hidden="true"></span><span class="device-btn b2" aria-hidden="true"></span><span class="device-btn b3" aria-hidden="true"></span>
+<span class="device-screen"><iframe src="${e(demo)}?embed=1" title="Página de exemplo" loading="lazy" tabindex="-1" scrolling="no"></iframe><span class="device-notch" aria-hidden="true"></span></span>
+</a>
+<p class="device-cap">Página real de uma cliente · <a href="${e(demo)}" target="_blank" rel="noopener">abrir</a></p>
 </div>
 </section>
 <section id="recursos" class="wrap sec">
 <h2 class="h2">Tudo que o seu negócio precisa numa página só</h2>
 <div class="grid3">${features.map(([ic, t, d]) => `<div class="feat"><span class="feat-ic">${ic}</span><h3>${e(t)}</h3><p>${e(d)}</p></div>`).join('')}</div>
 </section>
-<section id="planos" class="wrap sec">
-<h2 class="h2 center">Planos simples, sem surpresa</h2>
-<p class="center muted">Teste grátis por ${trialDays} dias. Depois, escolha como prefere pagar.</p>
-<div class="plans">${plan(plans.mensal, false)}${plan(plans.anual, true)}</div>
+<section class="wrap sec">
+<div class="cta-box">
+<div>
+<h2 class="h2" style="margin-bottom:10px">Tudo incluso, sem complicação</h2>
+<p class="muted" style="margin:0">Comece grátis por ${trialDays} dias com todos os recursos liberados.</p>
+</div>
+<ul class="incl">${included.map((x) => `<li>${I.check} ${e(x)}</li>`).join('')}</ul>
+<a href="/cadastro" class="btn btn-main btn-lg">Começar grátis</a>
+</div>
 </section>
 <section class="wrap sec faq">
 <h2 class="h2">Perguntas frequentes</h2>
 <details><summary>Preciso saber programar?</summary><p>Não. Você edita tudo pelo painel, com formulários simples e uma prévia ao vivo.</p></details>
 <details><summary>Como as clientes agendam?</summary><p>Elas tocam em "Agendar", escolhem serviço, data e horário. O pedido aparece no seu painel e abre o WhatsApp com a mensagem pronta.</p></details>
 <details><summary>Posso usar no link da bio do Instagram?</summary><p>Sim. Seu endereço fica com o nome do seu negócio.</p></details>
-<details><summary>E depois do teste grátis?</summary><p>Fale com a gente para ativar o plano mensal ou anual. Sua página e seus dados ficam guardados.</p></details>
+<details><summary>Minhas fotos e dados ficam seguros?</summary><p>Sim. Suas fotos, vídeos, textos e os dados das suas clientes ficam guardados com segurança e são só seus. Não vendemos nem compartilhamos com ninguém.</p></details>
 </section>
 </main>
-<footer class="foot"><div class="wrap foot-in">${logo(brand)}<span class="muted">© ${new Date().getFullYear()} ${e(brand)}</span></div></footer>`,
-  { desc: 'Crie seu site com agendamento online, carrosséis de fotos e métricas. Teste grátis.' });
+<footer class="foot"><div class="wrap foot-in">
+<div class="foot-l">${logo(brand)}<p class="muted small" style="margin:8px 0 0;max-width:460px">Seus dados, fotos e vídeos são protegidos e pertencem a você. Não vendemos nem compartilhamos as informações dos nossos clientes.</p></div>
+<span class="muted small">© ${year} ${e(brand)}. Todos os direitos reservados.</span>
+</div></footer>
+<script>
+/* encaixa a página de exemplo (390×844) dentro da tela do celular, sem distorcer */
+(function(){var s=document.querySelector('.device-screen'),f=s&&s.querySelector('iframe');if(!f)return;
+function fit(){var k=s.clientWidth/390;f.style.transform='scale('+k+')';}
+fit();if(window.ResizeObserver)new ResizeObserver(fit).observe(s);else addEventListener('resize',fit);})();
+</script>`,
+  { desc: 'Crie seu site com agendamento online, carrosséis de fotos e métricas. Comece grátis.' });
 }
 
-export function signupPage({ brand, plans, segments, trialDays, plan, root }) {
+export function signupPage({ brand, segments, trialDays, root }) {
   const suffix = root ? `.${root}` : '';
+  const year = new Date().getFullYear();
   return shell(`Criar conta · ${brand}`, `
 <main class="auth">
-<div class="auth-card wide">
+<div class="auth-card">
 ${logo(brand)}
-<h1>Crie sua página</h1>
-<p class="muted">${trialDays} dias grátis. Leva 2 minutos.</p>
+<div class="steps-head">
+<p class="step-count" id="stepCount" aria-live="polite">Etapa 1 de 4</p>
+<div class="step-bar" aria-hidden="true"><span id="stepBar" style="width:25%"></span></div>
+</div>
 <form id="signup" class="form" novalidate>
-<fieldset class="plan-pick"><legend>Plano</legend>
-${Object.values(plans).map((p) => `<label class="pick"><input type="radio" name="plan" value="${e(p.id)}"${p.id === plan ? ' checked' : ''}><span><strong>${e(p.name)}</strong> ${money(p.price)}/${e(p.period)}<small>${e(p.note)}</small></span></label>`).join('')}
-</fieldset>
+
+<fieldset class="step" data-step="1">
+<legend><h1>Sobre o seu negócio</h1><p class="muted">${trialDays} dias grátis, com tudo liberado.</p></legend>
 <label>Nome do negócio<input name="business_name" required maxlength="80" autocomplete="organization" placeholder="Ex.: Studio Vitória Lash"></label>
+<label>Segmento<select name="segment">${segments.map((s) => `<option>${e(s)}</option>`).join('')}</select></label>
+<label>Cidade <span class="opt">(opcional)</span><input name="city" maxlength="60" autocomplete="address-level2" placeholder="Ex.: Campo Grande · MS"></label>
+</fieldset>
+
+<fieldset class="step" data-step="2" hidden>
+<legend><h1>O link da sua página</h1><p class="muted">É o endereço que você vai colocar na bio do Instagram.</p></legend>
 <label>Link da sua página
 <span class="slug-field"><input name="slug" required maxlength="30" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="seunegocio"><span class="slug-suffix">${e(suffix || ' (link)')}</span></span>
-<small id="slugMsg" class="hint" aria-live="polite">Só letras, números e hífen.</small>
-<span class="url-preview" aria-live="polite"><span class="muted">Sua página vai ficar assim:</span> <b id="slugPreview" data-root="${e(root)}">${root ? 'seunegocio.' + e(root) : 'seunegocio'}</b></span></label>
-<div class="two">
+<small id="slugMsg" class="hint" aria-live="polite">Só letras, números e hífen.</small></label>
+<div class="url-card"><span class="muted small">Sua página vai ficar assim:</span><b id="slugPreview" data-root="${e(root)}">${root ? 'seunegocio.' + e(root) : 'seunegocio'}</b></div>
+</fieldset>
+
+<fieldset class="step" data-step="3" hidden>
+<legend><h1>Seus dados</h1><p class="muted">Para os agendamentos chegarem até você.</p></legend>
 <label>Seu nome<input name="owner_name" required maxlength="80" autocomplete="name"></label>
-<label>Segmento<select name="segment">${segments.map((s) => `<option>${e(s)}</option>`).join('')}</select></label>
-</div>
-<div class="two">
+<label>WhatsApp<input name="whatsapp" required inputmode="tel" autocomplete="tel" placeholder="(67) 99999-9999"></label>
 <label>E-mail<input name="email" type="email" required autocomplete="email"></label>
-<label>WhatsApp<input name="whatsapp" required inputmode="tel" placeholder="(67) 99999-9999"></label>
-</div>
-<div class="two">
-<label>Cidade<input name="city" maxlength="60" autocomplete="address-level2" placeholder="Ex.: Campo Grande · MS"></label>
-<label>Senha<input name="password" type="password" required minlength="6" autocomplete="new-password"></label>
-</div>
+</fieldset>
+
+<fieldset class="step" data-step="4" hidden>
+<legend><h1>Crie sua senha</h1><p class="muted">Você vai usar para entrar no painel.</p></legend>
+<label>Senha<input name="password" type="password" required minlength="6" autocomplete="new-password"><small class="hint">Pelo menos 6 caracteres.</small></label>
+<label>Repita a senha<input name="password2" type="password" required minlength="6" autocomplete="new-password"></label>
+</fieldset>
+
 <p class="err" role="alert"></p>
-<button class="btn btn-main btn-block btn-lg" type="submit">Criar minha página</button>
+<div class="step-nav">
+<button class="btn btn-line btn-lg" type="button" id="stepBack" hidden>Voltar</button>
+<button class="btn btn-main btn-lg" type="submit" id="stepNext">Continuar</button>
+</div>
 <p class="muted center small">Já tem conta? <a href="/entrar">Entrar</a></p>
 </form>
 </div>
+<p class="auth-foot">© ${year} ${e(brand)}. Todos os direitos reservados.</p>
 </main>`, { scripts: '<script src="/static/auth.js" defer></script>' });
 }
 
@@ -142,14 +165,16 @@ ${logo(brand)}
 <label>Senha<input name="password" type="password" required autocomplete="current-password"></label>
 <p class="err" role="alert"></p>
 <button class="btn btn-main btn-block btn-lg" type="submit">Entrar</button>
-<p class="muted center small">Ainda não tem conta? <a href="/cadastro">Teste grátis</a></p>
+<p class="muted center small">Ainda não tem conta? <a href="/cadastro">Começar grátis</a></p>
 </form>
 </div>
+<p class="auth-foot">© ${new Date().getFullYear()} ${e(brand)}. Todos os direitos reservados.</p>
 </main>`, { scripts: '<script src="/static/auth.js" defer></script>' });
 }
 
 export function appShell({ brand, kind }) {
   const isAdmin = kind === 'admin';
+  const pwa = isAdmin ? '' : `<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icons/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="${e(brand)}"><meta name="apple-mobile-web-app-status-bar-style" content="black">`;
   return shell(`${isAdmin ? 'Admin' : 'Painel'} · ${brand}`, `<div id="app" data-brand="${e(brand)}"><p class="loading">Carregando…</p></div>`,
-    { scripts: `<link rel="stylesheet" href="/static/panel.css"><script src="/static/${isAdmin ? 'admin' : 'panel'}.js" defer></script>` });
+    { headExtra: `${pwa}<link rel="stylesheet" href="/static/panel.css">`, scripts: `<script src="/static/${isAdmin ? 'admin' : 'panel'}.js" defer></script>` });
 }

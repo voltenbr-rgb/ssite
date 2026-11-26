@@ -51,6 +51,7 @@
     wave: '<path d="M2 12c3-4 5-4 8 0s5 4 8 0 3-2 4-2"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
+    download: '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/>',
     gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8c-2-4-6-4-6-1s6 1 6 1 6 2 6-1-4-3-6 1"/>',
   };
   const api = async (url, opts = {}) => {
@@ -73,6 +74,38 @@
   const get = (obj, path) => path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
   const set = (obj, path, val) => { const ks = path.split('.'); let o = obj; ks.slice(0, -1).forEach((k) => { if (o[k] == null || typeof o[k] !== 'object') o[k] = {}; o = o[k]; }); o[ks[ks.length - 1]] = val; };
 
+  /* ---------- app instalável (PWA) ---------- */
+  const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let installEvt = null;
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; document.querySelectorAll('[data-install]').forEach((b) => { b.hidden = false; }); });
+  window.addEventListener('appinstalled', () => { installEvt = null; document.querySelectorAll('[data-install]').forEach((b) => { b.hidden = true; }); toast('App instalado! Procure o ícone na sua tela inicial.'); });
+  async function installApp() {
+    if (installEvt) {
+      installEvt.prompt();
+      const r = await installEvt.userChoice.catch(() => null);
+      if (r && r.outcome === 'accepted') installEvt = null;
+      return;
+    }
+    const steps = isIOS
+      ? [['1', 'Abra este painel no Safari.'], ['2', 'Toque no botão Compartilhar (quadrado com seta para cima).'], ['3', 'Escolha "Adicionar à Tela de Início" e toque em Adicionar.']]
+      : /android/i.test(navigator.userAgent)
+        ? [['1', 'Abra este painel no Chrome.'], ['2', 'Toque no menu ⋮ no canto de cima.'], ['3', 'Escolha "Instalar app" ou "Adicionar à tela inicial".']]
+        : [['1', 'Use o Chrome ou o Edge no computador.'], ['2', 'Clique no ícone de instalar no canto direito da barra de endereço.'], ['3', 'Confirme em "Instalar". O painel abre como um programa.']];
+    const close = () => { modal.remove(); document.removeEventListener('keydown', esc); };
+    const esc = (e) => { if (e.key === 'Escape') close(); };
+    const modal = h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'instT', onclick: (e) => { if (e.target === modal) close(); } },
+      h('div', { class: 'modal-card', style: 'max-width:440px' },
+        h('div', { class: 'modal-h' }, h('h2', { id: 'instT' }, 'Instalar o app do painel'), h('button', { class: 'tbtn', type: 'button', 'aria-label': 'Fechar', onclick: close }, icon(IC.x, 16))),
+        h('p', { class: 'muted', style: 'margin:0' }, 'Fica com ícone na tela, abre direto no painel e sem barra do navegador.'),
+        h('ol', { class: 'inst' }, steps.map(([n, t]) => h('li', {}, h('span', { class: 'inst-n' }, n), h('span', {}, t)))),
+        h('button', { class: 'btn btn-main', type: 'button', onclick: close }, 'Entendi')));
+    document.addEventListener('keydown', esc);
+    document.body.append(modal);
+  }
+  const installBtn = (cls = 'btn btn-sky btn-sm') => h('button', { type: 'button', class: cls, 'data-install': '', hidden: isStandalone(), onclick: installApp }, icon(IC.download, 16), 'Instalar app');
+
   /* ---------- estrutura ---------- */
   const NAV = [['inicio', 'Início', IC.home], ['agendamentos', 'Agendamentos', IC.cal], ['pagina', 'Editar página', IC.edit], ['midia', 'Fotos e vídeos', IC.img], ['conta', 'Minha conta', IC.user]];
   let pendingCount = 0;
@@ -87,6 +120,7 @@
         h('button', { class: 'navi', 'aria-label': 'Sair', onclick: logout }, icon(IC.out, 22), h('span', { class: 'lbl', 'aria-hidden': 'true' }, 'Sair'))));
     const main = h('main', { class: 'main', id: 'main' });
     S._user = h('div', { class: 'topright' },
+      installBtn('btn btn-sky btn-sm install-top'),
       h('a', { href: S.me.url, target: '_blank', rel: 'noopener', class: 'circle', 'aria-label': 'Ver minha página', title: 'Ver minha página' }, icon(IC.eye, 19)),
       h('a', { href: '#agendamentos', class: 'circle', 'aria-label': pendingCount ? pendingCount + ' agendamentos novos' : 'Agendamentos', title: 'Agendamentos' }, icon(IC.bell, 19), pendingCount ? h('span', { class: 'dot' }) : null),
       h('a', { href: '#conta', class: 'user' }, h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials), h('span', { class: 'nm' }, (S.me.owner_name || '').split(' ')[0]), icon(IC.chev, 16)));
@@ -615,7 +649,11 @@
       me.paid_until ? h('p', { class: 'muted', style: 'margin:0' }, 'Pago até ' + fmtDate(me.paid_until) + '.') : null,
       h('p', { class: 'muted', style: 'margin:0' }, 'Para ativar ou trocar de plano (mensal ou anual), fale com o suporte.'),
       S.support ? h('div', {}, h('a', { class: 'btn btn-wa', href: `https://wa.me/${S.support}?text=${encodeURIComponent('Olá! Quero ativar o plano ' + (plan.name || '') + ' da página ' + me.slug + '.')}`, target: '_blank', rel: 'noopener' }, icon(IC.chat, 16), 'Falar com o suporte')) : null);
-    box.append(form, pw, planCard);
+    const appCard = isStandalone() ? null : h('div', { class: 'card app-card', style: 'margin-bottom:16px' },
+      h('span', { class: 'app-ic', 'aria-hidden': 'true' }, h('img', { src: '/icons/icon-192.png', alt: '', width: 56, height: 56 })),
+      h('div', { style: 'flex:1;min-width:200px' }, h('h2', { style: 'margin:0 0 4px' }, 'App do painel'), h('p', { class: 'muted', style: 'margin:0' }, 'Instale no celular ou no computador para abrir o painel com um toque, como um aplicativo.')),
+      installBtn('btn btn-main'));
+    box.append(...[appCard, form, pw, planCard].filter(Boolean));
   }
 
   /* ---------- roteamento ---------- */

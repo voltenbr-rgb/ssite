@@ -54,12 +54,12 @@ async function getConfig(env, tenantId) {
   return row ? JSON.parse(row.config) : null;
 }
 
-async function serveTenantPage(env, slug) {
+async function serveTenantPage(env, slug, embed = false) {
   const t = await getTenantBySlug(env, slug);
   if (!t) return html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Página não encontrada</title><body style="font-family:system-ui;background:#0F0A10;color:#F7F0E6;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center"><div><h1>Página não encontrada</h1><p>Confira o endereço digitado.</p></div>`, 404);
   const state = tenantState(t);
   const cfg = (await getConfig(env, t.id)) || defaultConfig({ businessName: t.business_name, ownerName: t.owner_name, whatsapp: t.whatsapp });
-  return html(renderPage(t, cfg, { offline: state === 'blocked' || state === 'expired' }), 200, { 'Cache-Control': 'no-cache' });
+  return html(renderPage(t, cfg, { offline: state === 'blocked' || state === 'expired', embed }), 200, { 'Cache-Control': 'no-cache' });
 }
 
 /* ---------------- validação da configuração ---------------- */
@@ -348,7 +348,25 @@ export default {
 
     try {
       // arquivos estáticos
-      if (p.startsWith('/static/') || p.startsWith('/seed/') || p === '/favicon.ico' || p === '/robots.txt') return env.ASSETS.fetch(request);
+      if (p.startsWith('/static/') || p.startsWith('/seed/') || p.startsWith('/icons/') || p === '/sw.js' || p === '/favicon.ico' || p === '/robots.txt') return env.ASSETS.fetch(request);
+
+      // manifesto do app do painel (PWA), com o nome da marca
+      if (p === '/manifest.webmanifest') {
+        const B = brand(env);
+        return new Response(JSON.stringify({
+          name: `${B} · Painel`, short_name: B, description: 'Seu painel: agendamentos, métricas e edição da sua página.',
+          id: '/painel', start_url: '/painel', scope: '/', display: 'standalone', background_color: '#E8F0FA', theme_color: '#1A1A1C', lang: 'pt-BR',
+          icons: [
+            { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+            { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
+          shortcuts: [
+            { name: 'Agendamentos', url: '/painel#agendamentos', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+            { name: 'Editar página', url: '/painel#pagina', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          ],
+        }), { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
+      }
 
       // mídia enviada pelos assinantes
       const mm = p.match(/^\/m\/([a-f0-9]+)$/);
@@ -370,11 +388,11 @@ export default {
       }
 
       const sm = p.match(/^\/s\/([a-z0-9-]+)\/?$/);
-      if (sm) return await serveTenantPage(env, sm[1]);
+      if (sm) return await serveTenantPage(env, sm[1], url.searchParams.has('embed'));
 
       const B = brand(env);
-      if (p === '/') return html(landingPage({ brand: B, plans: PLANS, trialDays: TRIAL_DAYS, demo: '/s/vitoriacarvalho' }));
-      if (p === '/cadastro') return html(signupPage({ brand: B, plans: PLANS, segments: SEGMENTS, trialDays: TRIAL_DAYS, plan: url.searchParams.get('plano') || 'mensal', root }));
+      if (p === '/') return html(landingPage({ brand: B, trialDays: TRIAL_DAYS, demo: '/s/' + (env.DEMO_SLUG || 'vitoriacarvalho') }));
+      if (p === '/cadastro') return html(signupPage({ brand: B, segments: SEGMENTS, trialDays: TRIAL_DAYS, root }));
       if (p === '/entrar') return html(loginPage({ brand: B }));
       if (p === '/painel' || p.startsWith('/painel/')) return html(appShell({ brand: B, kind: 'panel' }), 200, { 'Cache-Control': 'no-store' });
       if (p === '/admin') return html(appShell({ brand: B, kind: 'admin' }), 200, { 'Cache-Control': 'no-store' });
