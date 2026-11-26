@@ -250,3 +250,20 @@ table{width:100%;border-collapse:collapse;font-size:14px}
  .tbl td:nth-child(5){grid-column:2;grid-row:2/4;justify-self:end;align-self:center}
  .who small{display:none}
 }
+
+/* moldura presa na tela: só o conteúdo branco rola */
+@media (min-width:821px){
+ html,body{height:100%;overflow:hidden}
+ .app{height:calc(100vh - 48px);min-height:0;overflow:hidden}
+ .side{position:static;height:auto;align-self:stretch}
+ .main{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#D5DAE3 transparent}
+ .main::-webkit-scrollbar{width:10px}.main::-webkit-scrollbar-thumb{background:#D5DAE3;border-radius:10px;border:3px solid #fff}
+ .preview-col{top:0;height:calc(100vh - 150px)}
+}
+@media (min-width:821px) and (max-height:620px){.app{margin:10px;height:calc(100vh - 20px)}}
+.slug-row{display:flex;align-items:center;background:#F7F8FA;border:1px solid #E3E7EE;border-radius:12px;overflow:hidden}
+.slug-row input{border:0 !important;background:transparent !important;border-radius:0 !important;min-width:0}
+.slug-row:focus-within{outline:2px solid #111318;outline-offset:1px;background:#fff}
+.slug-row input:focus{outline:none !important}
+.slug-sfx{padding:0 12px;color:var(--muted);white-space:nowrap;font-size:14px}
+.url-prev{font-size:14px;font-weight:400;color:var(--muted);word-break:break-all}.url-prev b{color:var(--text)}

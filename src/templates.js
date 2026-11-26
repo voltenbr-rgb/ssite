@@ -106,10 +106,11 @@ ${logo(brand)}
 <fieldset class="plan-pick"><legend>Plano</legend>
 ${Object.values(plans).map((p) => `<label class="pick"><input type="radio" name="plan" value="${e(p.id)}"${p.id === plan ? ' checked' : ''}><span><strong>${e(p.name)}</strong> ${money(p.price)}/${e(p.period)}<small>${e(p.note)}</small></span></label>`).join('')}
 </fieldset>
-<label>Nome do negócio<input name="business_name" required maxlength="80" placeholder="Ex.: Studio Vitória Lash"></label>
-<label>Endereço da sua página
-<span class="slug-field"><input name="slug" required maxlength="30" autocapitalize="off" spellcheck="false" placeholder="seunegocio"><span class="slug-suffix">${e(suffix || ' (link)')}</span></span>
-<small id="slugMsg" class="hint" aria-live="polite">Só letras, números e hífen.</small></label>
+<label>Nome do negócio<input name="business_name" required maxlength="80" autocomplete="organization" placeholder="Ex.: Studio Vitória Lash"></label>
+<label>Link da sua página
+<span class="slug-field"><input name="slug" required maxlength="30" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="seunegocio"><span class="slug-suffix">${e(suffix || ' (link)')}</span></span>
+<small id="slugMsg" class="hint" aria-live="polite">Só letras, números e hífen.</small>
+<span class="url-preview" aria-live="polite"><span class="muted">Sua página vai ficar assim:</span> <b id="slugPreview" data-root="${e(root)}">${root ? 'seunegocio.' + e(root) : 'seunegocio'}</b></span></label>
 <div class="two">
 <label>Seu nome<input name="owner_name" required maxlength="80" autocomplete="name"></label>
 <label>Segmento<select name="segment">${segments.map((s) => `<option>${e(s)}</option>`).join('')}</select></label>
@@ -119,7 +120,7 @@ ${Object.values(plans).map((p) => `<label class="pick"><input type="radio" name=
 <label>WhatsApp<input name="whatsapp" required inputmode="tel" placeholder="(67) 99999-9999"></label>
 </div>
 <div class="two">
-<label>Cidade<input name="city" maxlength="60" placeholder="Ex.: Campo Grande · MS"></label>
+<label>Cidade<input name="city" maxlength="60" autocomplete="address-level2" placeholder="Ex.: Campo Grande · MS"></label>
 <label>Senha<input name="password" type="password" required minlength="6" autocomplete="new-password"></label>
 </div>
 <p class="err" role="alert"></p>

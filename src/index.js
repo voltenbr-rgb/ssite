@@ -130,7 +130,9 @@ async function api(request, env, url) {
     const s = slugify(url.searchParams.get('s'));
     if (!validSlug(s)) return json({ slug: s, available: false, reason: 'Use de 3 a 30 letras, números ou hífen.' });
     const exists = await getTenantBySlug(env, s);
-    return json({ slug: s, available: !exists, reason: exists ? 'Esse endereço já está em uso.' : '' });
+    const mine = exists ? await currentTenant(env, request) : null;
+    const ok = !exists || (mine && mine.id === exists.id);
+    return json({ slug: s, available: ok, reason: ok ? '' : 'Esse link já está em uso.' });
   }
   if (p === '/api/signup' && m === 'POST') {
     const d = await body(request);
@@ -174,12 +176,20 @@ async function api(request, env, url) {
   const t = await currentTenant(env, request);
   if (!t) return err('Faça login novamente.', 401);
 
-  if (p === '/api/me' && m === 'GET') return json({ tenant: publicTenant(t, env, url), plans: PLANS, segments: SEGMENTS, brand: brand(env), support: String(env.SUPPORT_WHATSAPP || '').replace(/\D/g, '') });
+  if (p === '/api/me' && m === 'GET') return json({ tenant: publicTenant(t, env, url), plans: PLANS, segments: SEGMENTS, brand: brand(env), support: String(env.SUPPORT_WHATSAPP || '').replace(/\D/g, ''), root: rootDomain(env) });
   if (p === '/api/me' && m === 'PUT') {
     const d = await body(request);
     const email = clean(d.email, 120).toLowerCase();
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return err('E-mail inválido.');
     const wa = String(d.whatsapp || '').replace(/\D/g, '').slice(0, 15);
+    if (d.slug != null && slugify(d.slug) !== t.slug) {
+      const ns = slugify(d.slug);
+      if (!validSlug(ns)) return err('Link inválido. Use de 3 a 30 letras, números ou hífen.');
+      const taken = await env.DB.prepare('SELECT id FROM tenants WHERE (slug = ? OR username = ?) AND id != ?').bind(ns, ns, t.id).first();
+      if (taken) return err('Esse link já está em uso.', 409);
+      // o usuário de login acompanha o link (se ainda era igual ao link antigo)
+      await env.DB.prepare('UPDATE tenants SET slug = ?, username = CASE WHEN username = ? THEN ? ELSE username END WHERE id = ?').bind(ns, t.slug, ns, t.id).run();
+    }
     try {
       await env.DB.prepare('UPDATE tenants SET business_name = ?, owner_name = ?, email = ?, whatsapp = ?, segment = ? WHERE id = ?')
         .bind(clean(d.business_name, 80) || t.business_name, clean(d.owner_name, 80) || t.owner_name, email || null, wa || t.whatsapp, clean(d.segment, 40), t.id).run();

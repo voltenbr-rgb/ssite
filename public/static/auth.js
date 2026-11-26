@@ -19,8 +19,11 @@
   const slug = signup.querySelector('[name=slug]'), biz = signup.querySelector('[name=business_name]'), msg = document.getElementById('slugMsg');
   const slugify = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
   let touched = false, timer = null;
+  const prev = document.getElementById('slugPreview');
+  const showPrev = () => { const s = slugify(slug.value) || 'seunegocio'; const r = prev.dataset.root; prev.textContent = r ? s + '.' + r : s; };
   const check = () => {
     clearTimeout(timer);
+    showPrev();
     const s = slugify(slug.value);
     if (!s) { msg.textContent = 'Só letras, números e hífen.'; msg.className = 'hint'; return; }
     timer = setTimeout(async () => {

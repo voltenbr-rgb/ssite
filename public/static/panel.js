@@ -577,12 +577,32 @@
     box.append(topline('Minha conta', ''));
     const F = (name, label, val, attrs = {}) => { const id = 'c_' + name; return h('div', { class: 'f' }, h('label', { for: id }, label), h('input', { id, name, type: 'text', value: val || '', ...attrs })); };
     const segSel = h('select', { id: 'c_segment', name: 'segment' }, S.segments.map((s) => h('option', { selected: s === me.segment }, s)));
+    // link da página (vira o subdomínio) com prévia ao vivo
+    const slugify = (v) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+    const slugIn = h('input', { id: 'c_slug', name: 'slug', type: 'text', value: me.slug, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'data-lpignore': 'true', 'aria-describedby': 'c_slug_msg c_slug_prev' });
+    const slugMsg = h('small', { id: 'c_slug_msg', 'aria-live': 'polite' });
+    const root = S.root;
+    const slugPrev = h('b', {}, '');
+    const showSlug = () => { const v = slugify(slugIn.value) || me.slug; slugPrev.textContent = root ? `${v}.${root}` : `${location.host}/s/${v}`; };
+    let slugT;
+    slugIn.addEventListener('input', () => {
+      showSlug(); clearTimeout(slugT);
+      const v = slugify(slugIn.value);
+      if (!v) { slugMsg.textContent = 'Só letras, números e hífen.'; slugMsg.style.color = ''; return; }
+      slugT = setTimeout(async () => { const r = await fetch('/api/slug-check?s=' + encodeURIComponent(v)).then((x) => x.json()).catch(() => null); if (!r) return; slugMsg.textContent = r.available ? (v === me.slug ? 'Este é o seu link atual.' : 'Disponível!') : r.reason; slugMsg.style.color = r.available ? 'var(--pos)' : 'var(--neg)'; }, 300);
+    });
+    slugIn.addEventListener('blur', () => { slugIn.value = slugify(slugIn.value) || me.slug; showSlug(); });
+    showSlug();
+    const slugField = h('div', { class: 'f', style: 'grid-column:1/-1' }, h('label', { for: 'c_slug' }, 'Link da sua página'),
+      h('div', { class: 'slug-row' }, slugIn, root ? h('span', { class: 'slug-sfx' }, '.' + root) : null),
+      h('span', { id: 'c_slug_prev', class: 'url-prev' }, 'Sua página: ', slugPrev), slugMsg,
+      h('small', {}, `Para entrar no painel, use seu e-mail ou o nome do link (hoje: ${me.username}).`));
     const form = h('form', { class: 'card', style: 'display:flex;flex-direction:column;gap:14px;margin-bottom:16px' },
       h('h2', {}, 'Seus dados'),
       h('div', { class: 'formgrid' }, F('business_name', 'Nome do negócio', me.business_name), F('owner_name', 'Seu nome', me.owner_name), F('email', 'E-mail', me.email, { type: 'email' }), F('whatsapp', 'WhatsApp', phoneFmt(me.whatsapp), { inputmode: 'tel' }), h('div', { class: 'f' }, h('label', { for: 'c_segment' }, 'Segmento'), segSel),
-        h('div', { class: 'f' }, h('span', {}, 'Usuário para entrar'), h('input', { type: 'text', value: me.username, disabled: true }))),
+        slugField),
       h('div', {}, h('button', { class: 'btn btn-main', type: 'submit' }, 'Salvar dados')));
-    form.addEventListener('submit', async (e) => { e.preventDefault(); try { await api('/api/me', { method: 'PUT', body: JSON.stringify(Object.fromEntries(new FormData(form))) }); await loadMe(); toast('Dados salvos.'); } catch (x) { toast(x.message, true); } });
+    form.addEventListener('submit', async (e) => { e.preventDefault(); try { const d = Object.fromEntries(new FormData(form)); d.slug = slugify(d.slug || me.slug); const changedSlug = d.slug !== me.slug; await api('/api/me', { method: 'PUT', body: JSON.stringify(d) }); await loadMe(); toast(changedSlug ? 'Link da página atualizado!' : 'Dados salvos.'); if (changedSlug) pageConta(); } catch (x) { toast(x.message, true); } });
     const pw = h('form', { class: 'card', style: 'display:flex;flex-direction:column;gap:14px;margin-bottom:16px' }, h('h2', {}, 'Trocar senha'),
       h('div', { class: 'formgrid' }, F('current', 'Senha atual', '', { type: 'password', autocomplete: 'current-password' }), F('next', 'Nova senha (6+ caracteres)', '', { type: 'password', autocomplete: 'new-password' })),
       h('div', {}, h('button', { class: 'btn btn-main', type: 'submit' }, 'Trocar senha')));
@@ -599,14 +619,14 @@
   }
 
   /* ---------- roteamento ---------- */
-  async function loadMe() { const r = await api('/api/me'); S.me = r.tenant; S.plans = r.plans; S.segments = r.segments; S.support = r.support; }
+  async function loadMe() { const r = await api('/api/me'); S.me = r.tenant; S.plans = r.plans; S.segments = r.segments; S.support = r.support; S.root = r.root; }
   const PAGES = { inicio: pageInicio, agendamentos: pageAgendamentos, pagina: pagePagina, midia: pageMidia, conta: pageConta };
   async function route() {
     const id = (location.hash || '#inicio').slice(1);
     if (S.page === 'pagina' && id !== 'pagina' && S.dirty && !confirm('Você tem alterações não publicadas na página. Sair mesmo assim?')) { history.replaceState(null, '', '#pagina'); return; }
     S.page = PAGES[id] ? id : 'inicio';
     if (S.page !== 'pagina') { saveBar = null; pvFrame = null; }
-    window.scrollTo(0, 0);
+    window.scrollTo(0, 0); const mm = document.getElementById('main'); if (mm) mm.scrollTop = 0;
     try { await PAGES[S.page](); } catch (e) { if (e.message !== 'Sessão expirada') toast(e.message, true); }
   }
   window.addEventListener('hashchange', route);
