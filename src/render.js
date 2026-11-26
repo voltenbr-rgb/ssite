@@ -1,4 +1,5 @@
 // Gera o HTML da página pública de um assinante a partir da configuração (JSON).
+import { makeTatico } from './tpl-tatico.js';
 
 export const e = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const safeUrl = (u) => {
@@ -289,6 +290,8 @@ ${body}
 /* ---------------- Modelos de página ----------------
    Cada modelo recebe a MESMA configuração (seções, fotos, serviços…) e desenha do seu jeito.
    Para adicionar um modelo: crie a função render e registre aqui. */
+const renderTatico = makeTatico({ e, safeUrl, color, digits, bookingModal, loop });
+
 export const TEMPLATES = {
   glamour: {
     id: 'glamour',
@@ -297,6 +300,16 @@ export const TEMPLATES = {
     thumb: '/static/models/glamour.jpg',
     tags: ['Beleza', 'Estética', 'Cílios', 'Unhas'],
     render: renderGlamour,
+    theme: { accent: '#D45AE8', accent2: '#E58BF2', bg: '#0F0A10', cream: '#F3E9C6' },
+  },
+  tatico: {
+    id: 'tatico',
+    name: 'Tático',
+    desc: 'Preto com neon laranja, fumaça animada e cartões com cantos de mira. Ótimo para airsoft, barbearia, tatuagem e lojas.',
+    thumb: '/static/models/tatico.jpg',
+    tags: ['Airsoft', 'Barbearia', 'Tatuagem', 'Loja'],
+    render: renderTatico,
+    theme: { accent: '#FF6A00', accent2: '#FF8F33', bg: '#070707', cream: '#F3F3F3' },
   },
 };
 
