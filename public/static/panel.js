@@ -523,17 +523,36 @@
     ['Verde', { accent: '#5ED3A0', accent2: '#9BE8C4', bg: '#0A110E', cream: '#E5F3EA' }],
     ['Terracota', { accent: '#E07A5F', accent2: '#F0A58F', bg: '#120C0A', cream: '#F5E6DA' }],
   ];
+  const ICONS = [['alvo', 'Alvo'], ['cupom', 'Cupom'], ['sino', 'Sino'], ['pessoas', 'Pessoas'], ['sorriso', 'Sorriso'], ['escudo', 'Escudo'], ['estrela', 'Estrela'], ['check', 'Check'], ['calendario', 'Calendário'], ['relogio', 'Relógio'], ['local', 'Local'], ['coracao', 'Coração'], ['raio', 'Raio'], ['presente', 'Presente'], ['tesoura', 'Tesoura'], ['carrinho', 'Carrinho']];
   const T = (path, label, opts = {}) => ({ type: opts.area ? 'textarea' : 'text', path, label, ...opts });
   const SECTIONS = [
     { key: 'template', title: 'Modelo da página', ic: IC.layout, fields: [{ type: 'template' }] },
     { key: 'theme', title: 'Cores', ic: IC.palette, fields: [{ type: 'theme' }] },
-    { key: 'brand', title: 'Nome e menu', ic: IC.tag, fields: [T('brand.name', 'Nome que aparece no topo'), T('brand.tagline', 'Subtítulo pequeno', { hint: 'Ex.: Lash Designer' })] },
+    { key: 'brand', title: 'Nome, topo e compartilhamento', ic: IC.tag, fields: [T('brand.name', 'Nome que aparece no topo'), T('brand.tagline', 'Subtítulo pequeno', { hint: 'Ex.: Lash Designer' }),
+      T('brand.announce', 'Faixa de aviso no topo (modelo Tático)', { hint: 'Ex.: Grupo VIP gratuito • Curadoria diária' }),
+      { type: 'bool', path: 'brand.topbar', label: 'Mostrar barra com a logo no topo (modelo Tático)' },
+      T('brand.title', 'Título na aba do navegador e no Google'), T('brand.description', 'Descrição para Google e WhatsApp', { area: true }),
+      { type: 'image', path: 'brand.ogImage', label: 'Imagem quando o link é compartilhado' }, { type: 'image', path: 'brand.favicon', label: 'Ícone da aba (favicon)' }] },
+    { key: 'cta', title: 'Botão principal', ic: IC.click, fields: [T('cta.text', 'Texto do botão', { hint: 'Ex.: Entrar no grupo gratuito' }), T('cta.url', 'Link do botão', { hint: 'Deixe vazio para o botão abrir o agendamento. Com link (ex.: grupo do WhatsApp), todos os botões levam para ele.' })] },
     { key: 'hero', title: 'Capa', ic: IC.home, fields: [
       { type: 'image', path: 'hero.photo', label: 'Sua foto principal (ou logo)' },
       { type: 'image', path: 'hero.bg', label: 'Imagem de fundo da capa (modelo Tático)' },
       T('hero.eyebrow', 'Cidade / chamada acima do título'), T('hero.title', 'Título'), T('hero.highlight', 'Palavra em destaque', { hint: 'Aparece colorida e em itálico' }),
-      T('hero.subtitle', 'Frase de apresentação', { area: true }), T('hero.address', 'Endereço curto'), T('hero.badge', 'Selo sobre a foto')] },
+      T('hero.after', 'Texto depois do destaque', { hint: 'Opcional. Ex.: selecionados.' }),
+      T('hero.subtitle', 'Frase de apresentação', { area: true }), T('hero.address', 'Endereço curto'), T('hero.badge', 'Selo sobre a foto'),
+      { type: 'strings', path: 'hero.trust', label: 'Selos abaixo do botão', placeholder: 'Ex.: 100% gratuito' },
+      { type: 'image', path: 'hero.bgMobile', label: 'Fundo da capa no celular (modelo Tático, opcional)' }] },
     { key: 'marquee', title: 'Faixa animada', ic: IC.wave, toggle: true, fields: [{ type: 'strings', path: 'marquee.words', label: 'Palavras que passam na faixa', placeholder: 'Ex.: Autoestima' }] },
+    { key: 'blocks', title: 'Blocos de conteúdo', ic: IC.layout, fields: [
+      { type: 'list', path: 'blocks', label: 'Blocos (benefícios, categorias, passos, regras…)', itemLabel: (x, i) => (x.eyebrow || x.title || 'Bloco ' + (i + 1)), add: () => ({ kind: 'cards', eyebrow: '', title: '', highlight: '', sub: '', alt: false, center: false, items: [] }), fields: [
+        { type: 'select', path: 'kind', label: 'Tipo', options: [['cards', 'Cartões com ícone'], ['steps', 'Passos numerados'], ['checks', 'Lista com checks']] },
+        T('eyebrow', 'Chamada (ex.: BENEFÍCIOS)'), T('title', 'Título'), T('highlight', 'Destaque do título'), T('sub', 'Texto abaixo do título', { area: true }),
+        { type: 'bool', path: 'alt', label: 'Fundo alternado', def: false }, { type: 'bool', path: 'center', label: 'Título centralizado', def: false },
+        { type: 'list', path: 'items', label: 'Itens', itemLabel: (x, i) => x.t || 'Item ' + (i + 1), add: () => ({ icon: 'alvo', t: '', d: '', note: '' }), fields: [
+          { type: 'select', path: 'icon', label: 'Ícone (cartões)', options: ICONS }, T('t', 'Título'), T('d', 'Texto', { area: true, hint: 'Use **assim** para negrito.' }), T('note', 'Observação (opcional)')] }] }] },
+    { key: 'faq', title: 'Perguntas frequentes', ic: IC.info, toggle: true, fields: [
+      T('faq.eyebrow', 'Chamada'), T('faq.title', 'Título'), T('faq.highlight', 'Destaque'),
+      { type: 'list', path: 'faq.items', label: 'Perguntas', itemLabel: (x, i) => x.q || 'Pergunta ' + (i + 1), add: () => ({ q: '', a: '' }), fields: [T('q', 'Pergunta'), T('a', 'Resposta', { area: true })] }] },
     { key: 'gallery', title: 'Galeria de fotos', ic: IC.img, toggle: true, fields: [
       { type: 'images', path: 'gallery.photos', label: 'Carrossel principal (fotos altas)' },
       { type: 'images', path: 'gallery.round', label: 'Carrossel de fotos redondas' },
@@ -560,7 +579,14 @@
     { key: 'booking', title: 'Agendamento', ic: IC.clock, toggle: true, toggleHint: 'Desligado: os botões abrem direto o WhatsApp.', fields: [
       T('booking.title', 'Título do formulário'), { type: 'strings', path: 'booking.times', label: 'Horários oferecidos', placeholder: 'Ex.: 14:30', time: true }, { type: 'weekdays', path: 'booking.closedWeekdays', label: 'Dias sem atendimento' }] },
     { key: 'contact', title: 'Contato e rodapé', ic: IC.chat, fields: [
-      T('contact.whatsapp', 'WhatsApp que recebe os agendamentos', { hint: 'Com DDD. Ex.: 67 99999-9999' }), T('contact.instagram', 'Instagram (sem @)'), T('contact.address', 'Endereço completo'), T('contact.title', 'Título do rodapé'), T('contact.highlight', 'Destaque do rodapé')] },
+      T('contact.whatsapp', 'WhatsApp que recebe os agendamentos', { hint: 'Com DDD. Ex.: 67 99999-9999' }), T('contact.instagram', 'Instagram (sem @)'), T('contact.address', 'Endereço completo'), T('contact.title', 'Título da chamada final'), T('contact.highlight', 'Destaque da chamada final'),
+      T('contact.limit', 'Aviso piscando (modelo Tático)', { hint: 'Ex.: Vagas limitadas por grupo' }), T('contact.text', 'Texto da chamada final', { area: true }), T('contact.ctaText', 'Texto do botão da chamada final'),
+      { type: 'strings', path: 'contact.trust', label: 'Selos da chamada final', placeholder: 'Ex.: Gratuito' }, T('footer.disclaimer', 'Aviso no rodapé', { area: true, rows: 4 })] },
+    { key: 'legal', title: 'Termos e privacidade', ic: IC.info, fields: [
+      T('legal.termos.updated', 'Termos — linha de atualização', { hint: 'Ex.: Última atualização: 25 de novembro de 2026' }),
+      T('legal.termos.body', 'Termos de uso', { area: true, rows: 12, hint: 'Use "## " para títulos, "- " para itens e **negrito**. Vazio = sem página de termos.' }),
+      T('legal.privacidade.updated', 'Privacidade — linha de atualização'),
+      T('legal.privacidade.body', 'Política de privacidade', { area: true, rows: 12, hint: 'Mesmo formato. Vazio = sem página de privacidade.' })] },
   ];
 
   let pvTimer, pvFrame, saveBar;
@@ -580,7 +606,7 @@
 
   function fieldText(obj, f) {
     const id = 'f' + Math.random().toString(36).slice(2, 8);
-    const input = f.type === 'textarea' ? h('textarea', { id, rows: 3 }) : h('input', { id, type: 'text', placeholder: f.placeholder || '' });
+    const input = f.type === 'textarea' ? h('textarea', { id, rows: f.rows || 3, placeholder: f.placeholder || '' }) : h('input', { id, type: 'text', placeholder: f.placeholder || '' });
     input.value = get(obj, f.path) ?? '';
     input.addEventListener('input', () => { set(obj, f.path, input.value); changed(); f.onInput && f.onInput(); });
     return h('div', { class: 'f' }, h('label', { for: id }, f.label), input, f.hint ? h('small', {}, f.hint) : null);
@@ -653,6 +679,17 @@
     draw();
     return wrap;
   }
+  function fieldBool(obj, f) {
+    const cb = h('input', { type: 'checkbox', checked: get(obj, f.path) !== false && (f.def !== false || get(obj, f.path) === true), 'aria-label': f.label });
+    cb.addEventListener('change', () => { set(obj, f.path, cb.checked); changed(); });
+    return h('label', { class: 'toggle', style: 'padding-top:0' }, h('span', {}, f.label, f.hint ? h('small', { class: 'muted', style: 'display:block;font-weight:400' }, f.hint) : null), h('span', { class: 'switch' }, cb, h('span')));
+  }
+  function fieldSelect(obj, f) {
+    const id = 'f' + Math.random().toString(36).slice(2, 8);
+    const sel = h('select', { id }, f.options.map(([v, l]) => h('option', { value: v, selected: (get(obj, f.path) ?? f.options[0][0]) === v }, l)));
+    sel.addEventListener('change', () => { set(obj, f.path, sel.value); changed(); f.onInput && f.onInput(); });
+    return h('div', { class: 'f' }, h('label', { for: id }, f.label), sel, f.hint ? h('small', {}, f.hint) : null);
+  }
   function fieldTemplate(obj) {
     const wrap = h('div', { class: 'f' }, h('p', { class: 'muted', style: 'margin:0' }, 'Carregando modelos…'));
     (async () => {
@@ -707,6 +744,8 @@
       case 'weekdays': return fieldWeekdays(obj, f);
       case 'theme': return fieldTheme(obj);
       case 'template': return fieldTemplate(obj);
+      case 'bool': return fieldBool(obj, f);
+      case 'select': return fieldSelect(obj, f);
       case 'list': return fieldList(obj, f);
       default: return h('span');
     }

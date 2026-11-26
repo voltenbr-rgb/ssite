@@ -335,8 +335,6 @@ section.tight{padding:0 0 96px}
 .mini-list b{color:var(--text)}
 .cta .trust a{text-decoration:none}
 .offline{min-height:100vh;display:grid;place-content:center;text-align:center;gap:12px;padding:24px}
-footer{padding-bottom:40px}
-@media (max-width:900px){footer{padding-bottom:110px}}
 @media (max-width:560px){.shot{width:220px;height:290px}.vshot{width:210px;height:373px}}
 
 /* dentro do celular de exemplo / miniatura */

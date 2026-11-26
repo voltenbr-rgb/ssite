@@ -28,7 +28,7 @@ const MEDIA = {
   getWithMetadata: async (k) => { const x = kv.get(k); return x ? { value: x.value, metadata: x.metadata } : { value: null }; },
   delete: async (k) => kv.delete(k),
 };
-const TYPES = { '.css': 'text/css', '.js': 'text/javascript', '.jpg': 'image/jpeg', '.png': 'image/png', '.mp4': 'video/mp4', '.html': 'text/html', '.ico': 'image/x-icon' };
+const TYPES = { '.css': 'text/css', '.js': 'text/javascript', '.jpg': 'image/jpeg', '.png': 'image/png', '.mp4': 'video/mp4', '.html': 'text/html', '.ico': 'image/x-icon', '.webp': 'image/webp' };
 const ASSETS = { fetch: async (req) => {
   const p = path.join(root, 'public', decodeURIComponent(new URL(req.url).pathname));
   if (!p.startsWith(path.join(root, 'public')) || !existsSync(p) || statSync(p).isDirectory()) return new Response('404', { status: 404 });

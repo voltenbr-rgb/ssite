@@ -231,7 +231,7 @@ function renderGlamour(tenant, config, { preview = false, offline = false, embed
   const name = c.brand?.name || tenant.business_name;
   const wa = digits(c.contact?.whatsapp || tenant.whatsapp);
   const svcNames = (c.services?.items || []).map((x) => x.name).filter(Boolean);
-  const data = { slug: tenant.slug, wa, booking: !!c.booking?.enabled, preview, closed: c.booking?.closedWeekdays || [], services: svcNames };
+  const data = { slug: tenant.slug, wa, booking: !!c.booking?.enabled && !safeUrl(c.cta?.url), preview, closed: c.booking?.closedWeekdays || [], services: svcNames, cta: safeUrl(c.cta?.url) };
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
   const description = c.hero?.subtitle || `${name} · ${c.brand?.tagline || ''}`;
   const ogImg = safeUrl(c.hero?.photo);
@@ -258,7 +258,7 @@ ${feedback(c)}
 ${contact(c)}
 <a href="#agendar" data-book="" class="wa-float" aria-label="Agendar horário">${CHAT(28)}</a>
 <div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Foto ampliada"><button type="button" id="lbClose" aria-label="Fechar">✕</button><img id="lbImg" alt=""></div>
-${bookingModal(c)}`;
+${safeUrl(c.cta?.url) ? '' : bookingModal(c)}`;
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -290,7 +290,7 @@ ${body}
 /* ---------------- Modelos de página ----------------
    Cada modelo recebe a MESMA configuração (seções, fotos, serviços…) e desenha do seu jeito.
    Para adicionar um modelo: crie a função render e registre aqui. */
-const renderTatico = makeTatico({ e, safeUrl, color, digits, bookingModal, loop });
+const tatico = makeTatico({ e, safeUrl, color, digits, bookingModal, loop });
 
 export const TEMPLATES = {
   glamour: {
@@ -308,7 +308,7 @@ export const TEMPLATES = {
     desc: 'Preto com neon laranja, fumaça animada e cartões com cantos de mira. Ótimo para airsoft, barbearia, tatuagem e lojas.',
     thumb: '/static/models/tatico.jpg',
     tags: ['Airsoft', 'Barbearia', 'Tatuagem', 'Loja'],
-    render: renderTatico,
+    render: tatico.render,
     theme: { accent: '#FF6A00', accent2: '#FF8F33', bg: '#070707', cream: '#F3F3F3' },
   },
 };
@@ -318,4 +318,9 @@ export const templateList = () => Object.values(TEMPLATES).map(({ render, ...t }
 export function renderPage(tenant, config, opts = {}) {
   const tpl = TEMPLATES[config?.template] || TEMPLATES.glamour;
   return tpl.render(tenant, config, opts);
+}
+
+// Termos de uso / Política de privacidade de cada página (texto editável no painel)
+export function renderLegalPage(tenant, config, which, opts = {}) {
+  return tatico.renderLegal(tenant, config, which, opts);
 }

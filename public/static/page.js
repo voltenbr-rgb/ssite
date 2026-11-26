@@ -110,6 +110,7 @@
   let lastFocus = null;
 
   function openBooking(service, note) {
+    if (SS.cta) { track('whatsapp', service || 'botão'); if (!SS.preview) window.open(SS.cta, '_blank', 'noopener'); return; }
     if (!bk) {
       const text = 'Olá! Vim pelo site e quero agendar' + (service ? ': ' + service : ' um horário') + '.';
       track('whatsapp', service || 'agendar');

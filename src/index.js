@@ -1,6 +1,6 @@
 // ssite — Worker principal (Cloudflare Workers + D1 + KV)
 import { hashPassword, verifyPassword, createSession, readSession, destroySession, cookie, randomToken } from './auth.js';
-import { renderPage, TEMPLATES, templateList } from './render.js';
+import { renderPage, renderLegalPage, TEMPLATES, templateList } from './render.js';
 import { defaultConfig, PLANS, TRIAL_DAYS, SEGMENTS, TIERS } from './defaults.js';
 import { landingPage, signupPage, loginPage, appShell } from './templates.js';
 
@@ -65,12 +65,18 @@ async function accountOf(env, t) {
   if (!t || !t.parent_id) return t;
   return (await env.DB.prepare('SELECT * FROM tenants WHERE id = ?').bind(t.parent_id).first()) || t;
 }
-async function serveTenantPage(env, slug, embed = false) {
+async function serveTenantPage(env, slug, embed = false, base = '', legal = null) {
   const t = await getTenantBySlug(env, slug);
   if (!t) return html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Página não encontrada</title><body style="font-family:system-ui;background:#0F0A10;color:#F7F0E6;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center"><div><h1>Página não encontrada</h1><p>Confira o endereço digitado.</p></div>`, 404);
   const state = tenantState(await accountOf(env, t));
   const cfg = (await getConfig(env, t.id)) || defaultConfig({ businessName: t.business_name, ownerName: t.owner_name, whatsapp: t.whatsapp });
-  return html(renderPage(t, cfg, { offline: state === 'blocked' || state === 'expired', embed }), 200, { 'Cache-Control': 'no-cache' });
+  const offline = state === 'blocked' || state === 'expired';
+  if (legal) {
+    const doc = offline ? null : renderLegalPage(t, cfg, legal, { base });
+    if (!doc) return html('<!doctype html><meta charset="utf-8"><title>Não encontrado</title><p style="font-family:system-ui">Página não encontrada.</p>', 404);
+    return html(doc, 200, { 'Cache-Control': 'no-cache' });
+  }
+  return html(renderPage(t, cfg, { offline, embed, base }), 200, { 'Cache-Control': 'no-cache' });
 }
 
 /* ---------------- validação da configuração ---------------- */
@@ -78,7 +84,7 @@ function sanitizeConfig(input) {
   // Mantém só estruturas JSON simples, limita tamanho de textos e listas.
   const walk = (v, depth = 0) => {
     if (depth > 6) return null;
-    if (typeof v === 'string') return v.slice(0, 2000);
+    if (typeof v === 'string') return v.slice(0, 12000);
     if (typeof v === 'number' || typeof v === 'boolean' || v === null) return v;
     if (Array.isArray(v)) return v.slice(0, 60).map((x) => walk(x, depth + 1));
     if (typeof v === 'object') {
@@ -557,12 +563,13 @@ export default {
         const sub = host.slice(0, -(root.length + 1));
         if (sub && sub !== 'www' && sub !== 'app') {
           if (p === '/' || p === '') return await serveTenantPage(env, sub);
+          if (p === '/termos' || p === '/privacidade') return await serveTenantPage(env, sub, false, '', p.slice(1));
           return Response.redirect(`https://${sub}.${root}/`, 302);
         }
       }
 
-      const sm = p.match(/^\/s\/([a-z0-9-]+)\/?$/);
-      if (sm) return await serveTenantPage(env, sm[1], url.searchParams.has('embed'));
+      const sm = p.match(/^\/s\/([a-z0-9-]+)(?:\/(termos|privacidade))?\/?$/);
+      if (sm) return await serveTenantPage(env, sm[1], url.searchParams.has('embed'), `/s/${sm[1]}`, sm[2] || null);
 
       const B = brand(env);
       if (p === '/') return html(landingPage({ brand: B, trialDays: TRIAL_DAYS, demo: '/s/' + (env.DEMO_SLUG || 'vitoriacarvalho') }));

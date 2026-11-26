@@ -1,0 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Inter:wght@400;600&display=swap');
+:root{--bg:#070707;--card:#121212;--line:#232323;--text:#f3f3f3;--muted:#a8a8a8;--o:#ff6a00;--o2:#ff8f33}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(700px 360px at 50% -80px,rgba(255,106,0,.14),transparent 70%)}
+a{color:var(--o2)}
+.wrap{width:min(820px,100% - 40px);margin-inline:auto}
+.top{position:sticky;top:0;z-index:5;background:rgba(7,7,7,.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,106,0,.15)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text)}
+.brand img{width:38px;height:38px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,106,0,.6),0 0 16px rgba(255,106,0,.4)}
+.brand span{font-family:Oswald,sans-serif;font-weight:700;font-size:19px;letter-spacing:1px}
+.brand b{color:var(--o)}
+.back{font-size:14px;font-weight:600;text-decoration:none;color:var(--muted);border:1px solid var(--line);padding:7px 14px;border-radius:999px;transition:.2s}
+.back:hover{color:var(--o2);border-color:var(--o)}
+.doc{padding:56px 0 72px}
+.tag{font-family:Oswald,sans-serif;font-size:13px;letter-spacing:3px;color:var(--o)}
+h1{font-family:Oswald,sans-serif;text-transform:uppercase;font-size:clamp(32px,6vw,48px);line-height:1.1;margin:6px 0 8px}
+h1 em{font-style:normal;color:var(--o);text-shadow:0 0 22px rgba(255,106,0,.45)}
+.upd{color:var(--muted);font-size:14px;margin-bottom:28px}
+h2{font-family:Oswald,sans-serif;text-transform:uppercase;letter-spacing:.5px;font-size:21px;margin:34px 0 10px;padding-left:14px;border-left:3px solid var(--o)}
+p,li{color:#d0d0d0;font-size:16px}
+p+p{margin-top:12px}
+ul{padding-left:22px;display:grid;gap:8px;margin-top:6px}
+li::marker{color:var(--o)}
+strong{color:var(--text)}
+footer{border-top:1px solid var(--line);padding:32px 0 44px;color:#7a7a7a;font-size:13px}
+footer nav{display:flex;flex-wrap:wrap;gap:8px 22px;margin-bottom:10px}
+footer nav a{color:#a8a8a8;text-decoration:none}
+footer nav a:hover{color:var(--o2)}
