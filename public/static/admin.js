@@ -160,7 +160,8 @@
         h('div', { class: 'sub-tags' },
           h('span', { class: 'pill ' + t.state, style: 'margin:0' }, STL[t.state] || t.state),
           h('span', { class: 'pill tier-' + t.tier, style: 'margin:0' }, (d.tiers[t.tier] || t.tier)),
-          h('span', { class: 'pill', style: 'margin:0;background:#F2F2F2' }, d.plans[t.plan]?.name || t.plan)),
+          h('span', { class: 'pill', style: 'margin:0;background:#F2F2F2' }, d.plans[t.plan]?.name || t.plan),
+          t.parent_id ? h('span', { class: 'pill', style: 'margin:0;background:#EEF;color:#334' }, 'Página extra de ' + t.parent_name) : h('span', { class: 'pill', style: 'margin:0;background:#F2F2F2' }, `${t.pages}/${t.max_pages} página${t.max_pages > 1 ? 's' : ''}`)),
         h('div', { class: 'sub-nums' }, h('span', {}, h('b', {}, num(t.views30)), ' visitas'), h('span', {}, h('b', {}, num(t.bookings)), ' agend.'), h('span', { class: 'muted' }, 'desde ' + fmt(t.created_at))),
         t.admin_note ? h('p', { class: 'sub-note' }, '“' + t.admin_note + '”') : null,
         h('div', { class: 'sub-act' }, h('button', { class: 'btn btn-main btn-sm', type: 'button', onclick: () => manage(t) }, 'Gerenciar')));
@@ -174,6 +175,7 @@
         sel('plan', Object.values(d.plans).map((p) => [p.id, p.name]), t.plan, 'Cobrança'),
         date('paid_until', t.paid_until, 'Pago até'),
         date('trial_ends', t.trial_ends, 'Teste grátis até'),
+        t.parent_id ? null : h('div', { class: 'f' }, h('label', { for: 'm_max' }, 'Limite de páginas'), h('input', { id: 'm_max', name: 'max_pages', type: 'number', min: 1, max: 50, value: t.max_pages || 1 })),
         h('div', { class: 'f' }, h('label', { for: 'm_np' }, 'Nova senha (opcional)'), h('input', { id: 'm_np', name: 'new_password', type: 'text', maxlength: 8, placeholder: '4 a 8 caracteres', autocomplete: 'off' })),
         h('div', { class: 'f', style: 'grid-column:1/-1' }, h('label', { for: 'm_note' }, 'Motivo / observação'), h('textarea', { id: 'm_note', name: 'note', rows: 2, placeholder: 'Ex.: pagou o plano anual pelo Pix em 26/11' })));
       const logEl = h('ul', { class: 'log' }, h('li', { class: 'muted' }, 'Carregando histórico…'));
@@ -187,7 +189,7 @@
         try { await api('/api/admin/tenants/' + t.id, { method: 'PATCH', body: JSON.stringify(v) }); toast('Salvo.'); close(); viewAssinantes(); } catch (e) { toast(e.message, true); }
       };
       const del = async () => {
-        const c = prompt(`Excluir "${t.business_name}" apaga a página, pedidos, fotos e vídeos para sempre. Isso não pode ser desfeito.\n\nPara confirmar, digite o link: ${t.slug}`);
+        const c = prompt(`Excluir "${t.business_name}" apaga ${t.parent_id ? 'esta página' : 'a conta e todas as páginas dela'}, com pedidos, fotos e vídeos, para sempre. Isso não pode ser desfeito.\n\nPara confirmar, digite o link: ${t.slug}`);
         if (c == null) return;
         try { await api('/api/admin/tenants/' + t.id, { method: 'DELETE', body: JSON.stringify({ confirm: c.trim(), note: form.querySelector('[name=note]').value }) }); toast('Conta excluída.'); close(); viewAssinantes(); } catch (e) { toast(e.message, true); }
       };
@@ -207,7 +209,7 @@
       setTimeout(() => form.querySelector('select').focus(), 50);
     }
     const s = d.summary;
-    box.append(top('Assinantes', `${s.total} no total · ${s.active} ativos · ${s.trial} em teste`),
+    box.append(top('Assinantes', `${s.total} contas · ${s.pages} páginas · ${s.active} ativas · ${s.trial} em teste`),
       h('div', { class: 'row', style: 'margin:0 0 12px;gap:10px;align-items:center;flex-wrap:wrap' }, search, chips),
       listEl);
     draw();

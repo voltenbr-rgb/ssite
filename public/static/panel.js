@@ -127,6 +127,72 @@
   const initialsOf = (n) => String(n || '?').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
   const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
+  /* ---------- várias páginas na mesma conta ---------- */
+  async function loadPages() { try { S.pages = await api('/api/pages?days=' + S.statDays); } catch (_) { S.pages = null; } }
+  async function switchPage(id) {
+    if (S.dirty && !confirm('Você tem alterações não publicadas. Trocar de página mesmo assim?')) return;
+    await api('/api/pages/switch', { method: 'POST', body: JSON.stringify({ id }) });
+    S.cfg = null; S.saved = ''; S.dirty = false; S.media = null;
+    await loadMe(); await loadPages();
+    try { const b = await api('/api/bookings'); S.bk = b.bookings || []; pendingCount = (b.counts || {}).novo || 0; } catch (_) {}
+    toast('Agora você está em: ' + S.me.business_name);
+    route(true);
+  }
+  function pageSwitcher() {
+    const P = S.pages;
+    if (!P || (P.pages.length < 2 && P.max < 2)) return null;
+    const cur = P.pages.find((x) => x.id === P.current) || P.pages[0];
+    const menu = h('div', { class: 'pg-menu', role: 'menu' },
+      P.pages.map((x) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(x.id === P.current), class: 'pg-item', onclick: () => { det.open = false; if (x.id !== P.current) switchPage(x.id); } },
+        h('span', { class: 'av' + (x.id === P.current ? '' : ' dark'), 'aria-hidden': 'true' }, initialsOf(x.business_name)), h('span', { class: 'pg-t' }, h('b', {}, x.business_name), h('small', {}, x.slug)), x.pending ? h('span', { class: 'count-s' }, x.pending) : null)),
+      h('button', { type: 'button', class: 'pg-add', role: 'menuitem', onclick: () => { det.open = false; addPageDialog(); } }, icon(IC.plus, 16), `Adicionar página (${P.pages.length}/${P.max})`));
+    const det = h('details', { class: 'pg-sw' }, h('summary', { 'aria-label': 'Trocar de página' }, h('span', { class: 'av', 'aria-hidden': 'true' }, initialsOf(cur.business_name)), h('span', { class: 'pg-cur' }, cur.business_name), icon(IC.chev, 16)), menu);
+    document.addEventListener('click', (e) => { if (det.open && !det.contains(e.target)) det.open = false; });
+    return det;
+  }
+  async function addPageDialog() {
+    const P = S.pages || { pages: [], max: 1 };
+    const close = () => { modal.remove(); document.removeEventListener('keydown', esc); };
+    const esc = (e) => { if (e.key === 'Escape') close(); };
+    let body;
+    if (P.pages.length >= P.max) {
+      body = [h('p', { style: 'margin:0' }, P.max > 1 ? `Você já usa as ${P.max} páginas do seu plano.` : 'O plano Simples tem 1 página.'),
+        h('p', { class: 'muted', style: 'margin:0' }, 'Para ter mais páginas na mesma conta, ative o plano Completo.'),
+        h('div', { class: 'row', style: 'justify-content:flex-end;gap:8px' }, h('button', { class: 'btn btn-line', type: 'button', onclick: close }, 'Fechar'),
+          S.support ? h('a', { class: 'btn btn-main', href: `https://wa.me/${S.support}?text=${encodeURIComponent('Olá! Quero o plano Completo para ter mais páginas na conta ' + S.me.account_username + '.')}`, target: '_blank', rel: 'noopener' }, 'Falar com o suporte') : null)];
+    } else {
+      if (!S.templates) { try { S.templates = (await api('/api/templates')).templates; } catch (_) { S.templates = []; } }
+      const slugify = (v) => v.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+      const nm = h('input', { id: 'np_name', type: 'text', maxlength: 80, placeholder: 'Ex.: Barbearia do Zé' });
+      const sl = h('input', { id: 'np_slug', type: 'text', maxlength: 30, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
+      const prev = h('b', {}, '—'), msg = h('small', { 'aria-live': 'polite' }), err = h('p', { class: 'err', role: 'alert', style: 'margin:0;color:var(--neg)' });
+      let touched = false, t0, tpl = (S.templates[0] || {}).id;
+      const show = () => { const v = slugify(sl.value) || 'seunegocio'; prev.textContent = S.root ? `${v}.${S.root}` : `${location.host}/s/${v}`; clearTimeout(t0); const q = slugify(sl.value); if (!q) { msg.textContent = ''; return; } t0 = setTimeout(async () => { const r = await fetch('/api/slug-check?s=' + encodeURIComponent(q)).then((x) => x.json()).catch(() => null); if (r) { msg.textContent = r.available ? 'Disponível!' : r.reason; msg.style.color = r.available ? 'var(--pos)' : 'var(--neg)'; } }, 250); };
+      nm.addEventListener('input', () => { if (!touched) { sl.value = slugify(nm.value); show(); } });
+      sl.addEventListener('input', () => { touched = true; show(); });
+      const tplGrid = h('div', { class: 'tpl-grid', role: 'radiogroup', 'aria-label': 'Modelo' });
+      const drawTpl = () => tplGrid.replaceChildren(...S.templates.map((x) => h('button', { type: 'button', class: 'tpl', role: 'radio', 'aria-checked': String(x.id === tpl), onclick: () => { tpl = x.id; drawTpl(); } }, h('span', { class: 'tpl-img' }, h('img', { src: x.thumb, alt: '' })), h('b', {}, x.name))));
+      drawTpl();
+      const create = h('button', { class: 'btn btn-main', type: 'button', onclick: async () => {
+        err.textContent = '';
+        if (!nm.value.trim()) { err.textContent = 'Digite o nome da página.'; nm.focus(); return; }
+        create.disabled = true;
+        try { await api('/api/pages', { method: 'POST', body: JSON.stringify({ business_name: nm.value, slug: slugify(sl.value || nm.value), template: tpl }) }); close(); S.cfg = null; S.media = null; await loadMe(); await loadPages(); toast('Página criada! Agora é só personalizar.'); location.hash = '#pagina'; route(true); }
+        catch (x) { err.textContent = x.message; create.disabled = false; }
+      } }, 'Criar página');
+      body = [h('p', { class: 'muted', style: 'margin:0' }, `Página ${P.pages.length + 1} de ${P.max}. Ela usa o mesmo login, e você troca entre as páginas no topo do painel.`),
+        h('div', { class: 'f' }, h('label', { for: 'np_name' }, 'Nome da nova página'), nm),
+        h('div', { class: 'f' }, h('label', { for: 'np_slug' }, 'Link da página'), h('div', { class: 'slug-row' }, sl, S.root ? h('span', { class: 'slug-sfx' }, '.' + S.root) : null), h('span', { class: 'url-prev' }, 'Vai ficar: ', prev), msg),
+        S.templates.length ? h('div', { class: 'f' }, h('span', {}, 'Modelo'), tplGrid) : null,
+        err, h('div', { class: 'row', style: 'justify-content:flex-end;gap:8px' }, h('button', { class: 'btn btn-line', type: 'button', onclick: close }, 'Cancelar'), create)];
+      setTimeout(() => nm.focus(), 50);
+    }
+    const modal = h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'npT', onclick: (e) => { if (e.target === modal) close(); } },
+      h('div', { class: 'modal-card', style: 'max-width:560px' }, h('div', { class: 'modal-h' }, h('h2', { id: 'npT' }, 'Adicionar página'), h('button', { class: 'tbtn', type: 'button', 'aria-label': 'Fechar', onclick: close }, icon(IC.x, 16))), ...body.filter(Boolean)));
+    document.addEventListener('keydown', esc);
+    document.body.append(modal);
+  }
+
   function layout(content) {
     const today = brToday();
     const todays = (S.bk || []).filter((b) => b.date === today && b.status !== 'cancelado').sort((a, b) => String(a.time).localeCompare(String(b.time)));
@@ -140,6 +206,7 @@
       h('a', { class: 'agenda-go', href: '#agendamentos', 'aria-label': 'Ver todos os agendamentos' }, icon(IC.right, 18)));
     const top = h('header', { class: 'ws-top' },
       h('a', { href: '#inicio', class: 'ws-logo', 'aria-label': BRAND }, BRAND.slice(0, 1).toUpperCase()),
+      pageSwitcher(),
       agenda,
       h('div', { class: 'top-icons' },
         installBtn('btn btn-lime btn-sm install-top'),
@@ -270,10 +337,26 @@
           h('li', {}, 'Conversão', h('b', {}, conv)))),
       isStandalone() ? null : h('div', { class: 'sum-box' }, h('h3', {}, 'App do painel'), h('p', { style: 'margin:0;color:#aaa;font-size:14px' }, 'Abra com um toque, no celular ou no computador.'), installBtn('btn btn-lime')));
 
+    await loadPages();
+    const P = S.pages;
+    let pagesSec = null;
+    if (P && (P.pages.length > 1 || P.max > 1)) {
+      const tot = P.pages.reduce((a, x) => ({ v: a.v + x.views, c: a.c + x.clicks, b: a.b + x.bookings_period }), { v: 0, c: 0, b: 0 });
+      const card = (x) => h('div', { class: 'pg-card notch' + (x.id === P.current ? ' cur' : '') },
+        h('button', { type: 'button', class: 'nb', onclick: () => { if (x.id !== P.current) switchPage(x.id); }, 'aria-label': (x.id === P.current ? 'Página atual: ' : 'Abrir ') + x.business_name },
+          h('span', { class: 'av' + (x.id === P.current ? ' dark' : ''), 'aria-hidden': 'true' }, initialsOf(x.business_name)),
+          h('b', { class: 'pg-name' }, x.business_name), h('small', { class: 'pg-slug' }, x.slug + (x.id === P.current ? ' · aberta agora' : '')),
+          h('span', { class: 'pg-nums' }, h('span', {}, h('b', {}, x.views), 'visitas'), h('span', {}, h('b', {}, x.clicks), 'cliques'), h('span', {}, h('b', {}, x.bookings_period), 'agend.')),
+          x.pending ? h('span', { class: 'pg-pend' }, `${x.pending} pedido${x.pending > 1 ? 's' : ''} novo${x.pending > 1 ? 's' : ''}`) : null),
+        h('a', { class: 'corner', href: x.url, target: '_blank', rel: 'noopener', 'aria-label': 'Abrir ' + x.business_name }, icon(IC.arrowUR, 16)));
+      pagesSec = h('section', {},
+        h('div', { class: 'sec-t' }, h('h2', {}, 'Suas páginas'), h('span', { class: 'cnt' }, `${P.pages.length} de ${P.max}`), h('span', { class: 'muted small' }, `Todas: ${tot.v} visitas · ${tot.c} cliques · ${tot.b} agendamentos`)),
+        h('div', { class: 'hscroll' }, P.pages.map(card), h('button', { type: 'button', class: 'pg-new', onclick: addPageDialog }, icon(IC.plus, 22), P.pages.length >= P.max ? 'Liberar mais páginas' : 'Adicionar página')));
+    }
     holder.replaceWith(
       head,
       st.pending ? h('div', { class: 'banner info' }, h('span', {}, `Você tem ${st.pending} pedido${st.pending > 1 ? 's' : ''} novo${st.pending > 1 ? 's' : ''} para confirmar.`), h('a', { href: '#agendamentos', class: 'btn btn-main btn-sm' }, 'Ver agora')) : '',
-      h('div', { class: 'ws-grid' }, h('div', { class: 'ws-col' }, leads, highlights), summary));
+      h('div', { class: 'ws-grid' }, h('div', { class: 'ws-col' }, pagesSec, leads, highlights), summary));
   }
 
   /* ---------- Agendamentos ---------- */
@@ -724,18 +807,19 @@
   /* ---------- roteamento ---------- */
   async function loadMe() { const r = await api('/api/me'); S.me = r.tenant; S.plans = r.plans; S.segments = r.segments; S.support = r.support; S.root = r.root; }
   const PAGES = { inicio: pageInicio, agendamentos: pageAgendamentos, pagina: pagePagina, midia: pageMidia, conta: pageConta };
-  async function route() {
+  async function route(force) {
     const id = (location.hash || '#inicio').slice(1);
-    if (S.page === 'pagina' && id !== 'pagina' && S.dirty && !confirm('Você tem alterações não publicadas na página. Sair mesmo assim?')) { history.replaceState(null, '', '#pagina'); return; }
+    if (!force && S.page === 'pagina' && id !== 'pagina' && S.dirty && !confirm('Você tem alterações não publicadas na página. Sair mesmo assim?')) { history.replaceState(null, '', '#pagina'); return; }
     S.page = PAGES[id] ? id : 'inicio';
     if (S.page !== 'pagina') { saveBar = null; pvFrame = null; }
     window.scrollTo(0, 0); const mm = document.getElementById('main'); if (mm) mm.scrollTop = 0;
     try { await PAGES[S.page](); } catch (e) { if (e.message !== 'Sessão expirada') toast(e.message, true); }
   }
-  window.addEventListener('hashchange', route);
+  window.addEventListener('hashchange', () => route());
   window.addEventListener('beforeunload', (e) => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
   (async () => {
     try { await loadMe(); } catch (_) { return; }
+    await loadPages();
     try { const b = await api('/api/bookings'); S.bk = b.bookings || []; pendingCount = (b.counts || {}).novo || 0; } catch (_) {}
     if (new URLSearchParams(location.search).get('bemvinda')) { history.replaceState(null, '', '/painel#pagina'); setTimeout(() => toast('Conta criada! Comece colocando sua foto e seus serviços.'), 400); }
     route();

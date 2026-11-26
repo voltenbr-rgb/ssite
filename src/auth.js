@@ -38,11 +38,11 @@ export function cookie(name, value, { maxAge = 60 * 60 * 24 * 30, secure = true 
 
 const DAYS30 = 30 * 24 * 60 * 60 * 1000;
 
-export async function createSession(env, { tenantId = null, isAdmin = false }) {
+export async function createSession(env, { tenantId = null, accountId = null, isAdmin = false }) {
   const token = randomToken();
   const expires = new Date(Date.now() + DAYS30).toISOString();
-  await env.DB.prepare('INSERT INTO sessions (token, tenant_id, is_admin, expires_at) VALUES (?, ?, ?, ?)')
-    .bind(token, tenantId, isAdmin ? 1 : 0, expires).run();
+  await env.DB.prepare('INSERT INTO sessions (token, tenant_id, account_id, is_admin, expires_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(token, tenantId, accountId ?? tenantId, isAdmin ? 1 : 0, expires).run();
   return token;
 }
 

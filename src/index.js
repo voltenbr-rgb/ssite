@@ -61,10 +61,14 @@ async function getConfig(env, tenantId) {
   return row ? JSON.parse(row.config) : null;
 }
 
+async function accountOf(env, t) {
+  if (!t || !t.parent_id) return t;
+  return (await env.DB.prepare('SELECT * FROM tenants WHERE id = ?').bind(t.parent_id).first()) || t;
+}
 async function serveTenantPage(env, slug, embed = false) {
   const t = await getTenantBySlug(env, slug);
   if (!t) return html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Página não encontrada</title><body style="font-family:system-ui;background:#0F0A10;color:#F7F0E6;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center"><div><h1>Página não encontrada</h1><p>Confira o endereço digitado.</p></div>`, 404);
-  const state = tenantState(t);
+  const state = tenantState(await accountOf(env, t));
   const cfg = (await getConfig(env, t.id)) || defaultConfig({ businessName: t.business_name, ownerName: t.owner_name, whatsapp: t.whatsapp });
   return html(renderPage(t, cfg, { offline: state === 'blocked' || state === 'expired', embed }), 200, { 'Cache-Control': 'no-cache' });
 }
@@ -92,10 +96,23 @@ function sanitizeConfig(input) {
 }
 
 /* ---------------- autenticação ---------------- */
-async function currentTenant(env, request) {
+async function currentCtx(env, request) {
   const s = await readSession(env, request, 'ss_sess');
   if (!s || !s.tenant_id) return null;
-  return env.DB.prepare('SELECT * FROM tenants WHERE id = ?').bind(s.tenant_id).first();
+  const accId = s.account_id || s.tenant_id;
+  const account = await env.DB.prepare('SELECT * FROM tenants WHERE id = ?').bind(accId).first();
+  if (!account) return null;
+  let page = s.tenant_id === account.id ? account : await env.DB.prepare('SELECT * FROM tenants WHERE id = ? AND parent_id = ?').bind(s.tenant_id, account.id).first();
+  if (!page) page = account;
+  return { session: s, account, page };
+}
+async function currentTenant(env, request) {
+  const c = await currentCtx(env, request);
+  return c ? c.page : null;
+}
+async function accountPages(env, account) {
+  const r = await env.DB.prepare('SELECT * FROM tenants WHERE id = ? OR parent_id = ? ORDER BY (parent_id IS NOT NULL), id').bind(account.id, account.id).all();
+  return r.results;
 }
 async function isAdmin(env, request) {
   const s = await readSession(env, request, 'ss_admin');
@@ -120,7 +137,7 @@ async function api(request, env, url) {
     const d = await body(request);
     if (d.website) return json({ ok: true }); // robô (campo escondido preenchido)
     const t = await getTenantBySlug(env, clean(d.slug, 40));
-    if (!t || !['trial', 'active'].includes(tenantState(t))) return err('Página indisponível.', 404);
+    if (!t || !['trial', 'active'].includes(tenantState(await accountOf(env, t)))) return err('Página indisponível.', 404);
     const name = clean(d.name, 80), phone = String(d.phone || '').replace(/\D/g, '').slice(0, 15);
     if (!name || phone.length < 10) return err('Nome e WhatsApp são obrigatórios.');
     const date = /^\d{4}-\d{2}-\d{2}$/.test(d.date || '') ? d.date : null;
@@ -160,10 +177,10 @@ async function api(request, env, url) {
     if (!validSlug(slug)) return err('Endereço inválido. Use de 3 a 30 letras, números ou hífen.');
     if (passError(password)) return err(passError(password));
     const wa = whatsapp.startsWith('55') ? whatsapp : '55' + whatsapp;
-    const dup = await env.DB.prepare('SELECT slug, email, username, whatsapp FROM tenants WHERE slug = ? OR email = ? OR username = ? OR whatsapp = ?').bind(slug, email, slug, wa).first();
+    const dup = await env.DB.prepare('SELECT slug, email, username, whatsapp FROM tenants WHERE slug = ? OR email = ? OR username = ? OR (whatsapp = ? AND parent_id IS NULL)').bind(slug, email, slug, wa).first();
     if (dup) return err(dup.email === email ? 'Esse e-mail já tem cadastro. Entre na sua conta.' : dup.whatsapp === wa ? 'Esse WhatsApp já tem cadastro. Entre na sua conta.' : 'Esse link já está em uso.', 409);
     const trialEnds = new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString();
-    const res = await env.DB.prepare('INSERT INTO tenants (slug, business_name, owner_name, username, email, whatsapp, segment, password_hash, plan, status, trial_ends) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id')
+    const res = await env.DB.prepare("INSERT INTO tenants (slug, business_name, owner_name, username, email, whatsapp, segment, password_hash, plan, status, trial_ends, tier, max_pages) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'simples', 1) RETURNING id")
       .bind(slug, business, owner, slug, email, wa, clean(d.segment, 40), await hashPassword(password), plan, 'trial', trialEnds).first();
     const cfg0 = defaultConfig({ businessName: business, ownerName: owner, whatsapp: wa, city: clean(d.city, 60) });
     if (TEMPLATES[d.template]) cfg0.template = d.template;
@@ -179,10 +196,11 @@ async function api(request, env, url) {
     const digits = login.replace(/\D/g, '');
     const isPhone = digits.length >= 10 && digits.length <= 13 && /^[\d\s()+.-]+$/.test(login);
     const t = isPhone
-      ? await env.DB.prepare('SELECT * FROM tenants WHERE whatsapp = ? OR whatsapp = ? LIMIT 1').bind(phoneKey(digits), digits).first()
-      : await env.DB.prepare("SELECT * FROM tenants WHERE replace(lower(username), '-', '') = ? OR lower(email) = ? OR replace(slug, '-', '') = ? LIMIT 1").bind(key, login, key).first();
-    if (!t || !(await verifyPassword(String(d.password || ''), t.password_hash))) return err('Usuário ou senha incorretos.', 401);
-    const token = await createSession(env, { tenantId: t.id });
+      ? await env.DB.prepare('SELECT * FROM tenants WHERE (whatsapp = ? OR whatsapp = ?) ORDER BY (parent_id IS NOT NULL) LIMIT 1').bind(phoneKey(digits), digits).first()
+      : await env.DB.prepare("SELECT * FROM tenants WHERE replace(lower(username), '-', '') = ? OR lower(email) = ? OR replace(slug, '-', '') = ? ORDER BY (parent_id IS NOT NULL) LIMIT 1").bind(key, login, key).first();
+    const acc = await accountOf(env, t);
+    if (!acc || !(await verifyPassword(String(d.password || ''), acc.password_hash))) return err('Usuário ou senha incorretos.', 401);
+    const token = await createSession(env, { tenantId: t.id, accountId: acc.id });
     return json({ ok: true }, 200, { 'Set-Cookie': cookie('ss_sess', token, { secure }) });
   }
   if (p === '/api/logout' && m === 'POST') {
@@ -197,7 +215,54 @@ async function api(request, env, url) {
   const t = await currentTenant(env, request);
   if (!t) return err('Faça login novamente.', 401);
 
-  if (p === '/api/me' && m === 'GET') return json({ tenant: publicTenant(t, env, url), plans: PLANS, segments: SEGMENTS, brand: brand(env), support: String(env.SUPPORT_WHATSAPP || '').replace(/\D/g, ''), root: rootDomain(env) });
+  const ctx = await currentCtx(env, request);
+  const acc = ctx.account;
+  if (p === '/api/pages' && m === 'GET') {
+    const days = Math.min(90, Math.max(1, Number(url.searchParams.get('days')) || 30));
+    const from = brDay(new Date(Date.now() - (days - 1) * 86400000));
+    const pages = await accountPages(env, acc);
+    const ids = pages.map((x) => x.id);
+    const qs = ids.map(() => '?').join(',');
+    const [ev, bk] = await env.DB.batch([
+      env.DB.prepare(`SELECT tenant_id, type, COUNT(*) AS n FROM events WHERE tenant_id IN (${qs}) AND day >= ? GROUP BY tenant_id, type`).bind(...ids, from),
+      env.DB.prepare(`SELECT tenant_id, COUNT(*) AS n, SUM(CASE WHEN status = 'novo' THEN 1 ELSE 0 END) AS pending FROM bookings WHERE tenant_id IN (${qs}) GROUP BY tenant_id`).bind(...ids),
+    ]);
+    const stats = {}; ev.results.forEach((r) => { (stats[r.tenant_id] = stats[r.tenant_id] || {})[r.type] = r.n; });
+    const bks = {}; bk.results.forEach((r) => { bks[r.tenant_id] = r; });
+    return json({
+      days, current: t.id, max: acc.max_pages || 1, tier: acc.tier || 'simples',
+      pages: pages.map((x) => ({ id: x.id, slug: x.slug, business_name: x.business_name, url: publicUrl(env, url, x.slug), main: !x.parent_id,
+        views: stats[x.id]?.view || 0, clicks: (stats[x.id]?.whatsapp || 0) + (stats[x.id]?.booking_open || 0), services: stats[x.id]?.service || 0,
+        bookings_period: stats[x.id]?.booking || 0, bookings: bks[x.id]?.n || 0, pending: bks[x.id]?.pending || 0 })),
+    });
+  }
+  if (p === '/api/pages/switch' && m === 'POST') {
+    const d = await body(request);
+    const pg = (await accountPages(env, acc)).find((x) => x.id === Number(d.id));
+    if (!pg) return err('Página não encontrada.', 404);
+    await env.DB.prepare('UPDATE sessions SET tenant_id = ? WHERE token = ?').bind(pg.id, ctx.session.token).run();
+    return json({ ok: true });
+  }
+  if (p === '/api/pages' && m === 'POST') {
+    const d = await body(request);
+    const pages = await accountPages(env, acc);
+    if (pages.length >= (acc.max_pages || 1)) return err(`Seu plano permite ${acc.max_pages || 1} página${(acc.max_pages || 1) > 1 ? 's' : ''}. Fale com o suporte para liberar mais.`, 403);
+    const business = clean(d.business_name, 80);
+    const slug = slugify(d.slug || business);
+    if (!business) return err('Digite o nome da página.');
+    if (!validSlug(slug)) return err('Link inválido. Use de 3 a 30 letras, números ou hífen.');
+    if (await env.DB.prepare('SELECT id FROM tenants WHERE slug = ? OR username = ?').bind(slug, slug).first()) return err('Esse link já está em uso.', 409);
+    const wa = String(d.whatsapp || '').replace(/\D/g, '') || acc.whatsapp;
+    const res = await env.DB.prepare('INSERT INTO tenants (slug, business_name, owner_name, username, email, whatsapp, segment, password_hash, plan, status, trial_ends, paid_until, tier, max_pages, parent_id) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?) RETURNING id')
+      .bind(slug, business, acc.owner_name, slug, wa.startsWith('55') ? wa : '55' + wa, clean(d.segment, 40) || acc.segment, acc.password_hash, acc.plan, acc.status, acc.trial_ends, acc.paid_until, acc.tier || 'simples', acc.id).first();
+    const cfg0 = defaultConfig({ businessName: business, ownerName: acc.owner_name, whatsapp: wa.startsWith('55') ? wa : '55' + wa, city: clean(d.city, 60) });
+    if (TEMPLATES[d.template]) { cfg0.template = d.template; if (TEMPLATES[d.template].theme) cfg0.theme = { ...TEMPLATES[d.template].theme }; }
+    await env.DB.prepare('INSERT INTO pages (tenant_id, config) VALUES (?, ?)').bind(res.id, JSON.stringify(cfg0)).run();
+    await env.DB.prepare('UPDATE sessions SET tenant_id = ? WHERE token = ?').bind(res.id, ctx.session.token).run();
+    return json({ ok: true, id: res.id, slug });
+  }
+
+  if (p === '/api/me' && m === 'GET') return json({ tenant: { ...publicTenant(t, env, url), state: tenantState(acc), plan: acc.plan, tier: acc.tier || 'simples', trial_ends: acc.trial_ends, paid_until: acc.paid_until, status: acc.status, main: !t.parent_id, account_username: acc.username, max_pages: acc.max_pages || 1 }, plans: PLANS, segments: SEGMENTS, brand: brand(env), support: String(env.SUPPORT_WHATSAPP || '').replace(/\D/g, ''), root: rootDomain(env) });
   if (p === '/api/me' && m === 'PUT') {
     const d = await body(request);
     const email = clean(d.email, 120).toLowerCase();
@@ -219,9 +284,10 @@ async function api(request, env, url) {
   }
   if (p === '/api/me/password' && m === 'POST') {
     const d = await body(request);
-    if (!(await verifyPassword(String(d.current || ''), t.password_hash))) return err('Senha atual incorreta.', 401);
+    if (!(await verifyPassword(String(d.current || ''), acc.password_hash))) return err('Senha atual incorreta.', 401);
     if (passError(String(d.next || ''))) return err(passError(String(d.next || '')));
-    await env.DB.prepare('UPDATE tenants SET password_hash = ? WHERE id = ?').bind(await hashPassword(String(d.next)), t.id).run();
+    const nh = await hashPassword(String(d.next));
+    await env.DB.prepare('UPDATE tenants SET password_hash = ? WHERE id = ? OR parent_id = ?').bind(nh, acc.id, acc.id).run();
     return json({ ok: true });
   }
 
@@ -327,8 +393,8 @@ async function adminApi(request, env, url, secure) {
       env.DB.prepare('SELECT type, COUNT(*) AS n FROM events WHERE day >= ? GROUP BY type').bind(from),
       env.DB.prepare("SELECT day, COUNT(*) AS n FROM events WHERE day >= ? AND type = 'view' GROUP BY day").bind(from),
       env.DB.prepare("SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS n FROM bookings WHERE created_at >= ? GROUP BY day").bind(from),
-      env.DB.prepare('SELECT status, plan, trial_ends, COUNT(*) AS n FROM tenants GROUP BY status, plan, trial_ends < ?').bind(new Date().toISOString()),
-      env.DB.prepare('SELECT id, slug, business_name, owner_name, segment, whatsapp, status, trial_ends, created_at FROM tenants ORDER BY created_at DESC LIMIT 8'),
+      env.DB.prepare('SELECT status, plan, trial_ends, COUNT(*) AS n FROM tenants WHERE parent_id IS NULL GROUP BY status, plan, trial_ends < ?').bind(new Date().toISOString()),
+      env.DB.prepare('SELECT id, slug, business_name, owner_name, segment, whatsapp, status, trial_ends, created_at FROM tenants WHERE parent_id IS NULL ORDER BY created_at DESC LIMIT 8'),
       env.DB.prepare(`SELECT t.id, t.slug, t.business_name,
         SUM(CASE WHEN e.type = 'view' THEN 1 ELSE 0 END) AS views,
         SUM(CASE WHEN e.type IN ('whatsapp','booking_open') THEN 1 ELSE 0 END) AS clicks,
@@ -361,11 +427,14 @@ async function adminApi(request, env, url, secure) {
     const from = brDay(new Date(Date.now() - 29 * 86400000));
     const r = await env.DB.prepare(`SELECT t.*,
       (SELECT COUNT(*) FROM events e WHERE e.tenant_id = t.id AND e.type = 'view' AND e.day >= ?) AS views30,
-      (SELECT COUNT(*) FROM bookings b WHERE b.tenant_id = t.id) AS bookings
-      FROM tenants t ORDER BY t.created_at DESC`).bind(from).all();
-    const list = r.results.map((t) => ({ ...publicTenant(t, env, url), views30: t.views30, bookings: t.bookings, admin_note: t.admin_note || '' }));
-    const mrr = list.filter((t) => t.state === 'active').reduce((s, t) => s + (t.plan === 'anual' ? PLANS.anual.price / 12 : PLANS.mensal.price), 0);
-    return json({ tenants: list, plans: PLANS, tiers: TIERS, summary: { total: list.length, active: list.filter((t) => t.state === 'active').length, trial: list.filter((t) => t.state === 'trial').length, mrr } });
+      (SELECT COUNT(*) FROM bookings b WHERE b.tenant_id = t.id) AS bookings,
+      (SELECT COUNT(*) FROM tenants c WHERE c.parent_id = t.id) AS extra_pages,
+      (SELECT business_name FROM tenants pp WHERE pp.id = t.parent_id) AS parent_name
+      FROM tenants t ORDER BY COALESCE(t.parent_id, t.id) DESC, t.parent_id IS NOT NULL, t.id`).bind(from).all();
+    const list = r.results.map((t) => ({ ...publicTenant(t, env, url), views30: t.views30, bookings: t.bookings, admin_note: t.admin_note || '', parent_id: t.parent_id, parent_name: t.parent_name, pages: 1 + (t.extra_pages || 0), max_pages: t.max_pages || 1 }));
+    const mains = list.filter((t) => !t.parent_id);
+    const mrr = mains.filter((t) => t.state === 'active').reduce((s, t) => s + (t.plan === 'anual' ? PLANS.anual.price / 12 : PLANS.mensal.price), 0);
+    return json({ tenants: list, plans: PLANS, tiers: TIERS, summary: { total: mains.length, pages: list.length, active: mains.filter((t) => t.state === 'active').length, trial: mains.filter((t) => t.state === 'trial').length, mrr } });
   }
   const tm = p.match(/^\/api\/admin\/tenants\/(\d+)(\/impersonate)?$/);
   if (tm && m === 'PATCH') {
@@ -382,11 +451,15 @@ async function adminApi(request, env, url, secure) {
       if (!validSlug(slug)) return err('Endereço inválido.');
       if (await getTenantBySlug(env, slug)) return err('Esse endereço já está em uso.', 409);
     }
+    const changes0 = [];
     const tier = TIERS[d.tier] ? d.tier : (t.tier || 'completo');
     const note = clean(d.note, 500);
-    await env.DB.prepare('UPDATE tenants SET status = ?, plan = ?, tier = ?, paid_until = ?, trial_ends = ?, slug = ?, admin_note = COALESCE(?, admin_note) WHERE id = ?').bind(status, plan, tier, paid, trial, slug, note || null, t.id).run();
+    const maxPages = Number.isInteger(Number(d.max_pages)) && Number(d.max_pages) >= 1 && Number(d.max_pages) <= 50 ? Number(d.max_pages) : (t.max_pages || 1);
+    await env.DB.prepare('UPDATE tenants SET status = ?, plan = ?, tier = ?, paid_until = ?, trial_ends = ?, slug = ?, admin_note = COALESCE(?, admin_note), max_pages = ? WHERE id = ?').bind(status, plan, tier, paid, trial, slug, note || null, t.parent_id ? 0 : maxPages, t.id).run();
+    if (!t.parent_id) await env.DB.prepare('UPDATE tenants SET status = ?, plan = ?, tier = ?, paid_until = ?, trial_ends = ? WHERE parent_id = ?').bind(status, plan, tier, paid, trial, t.id).run();
+    if (!t.parent_id && maxPages !== (t.max_pages || 1)) changes0.push(`Limite de páginas: ${t.max_pages || 1} → ${maxPages}`);
     const STL = { trial: 'Teste', active: 'Ativo', blocked: 'Fora do ar' };
-    const changes = [];
+    const changes = changes0;
     if (status !== t.status) changes.push(`Status: ${STL[t.status] || t.status} → ${STL[status]}`);
     if (tier !== (t.tier || 'completo')) changes.push(`Plano: ${TIERS[t.tier || 'completo']} → ${TIERS[tier]}`);
     if (plan !== t.plan) changes.push(`Cobrança: ${PLANS[t.plan]?.name || t.plan} → ${PLANS[plan].name}`);
@@ -411,6 +484,12 @@ async function adminApi(request, env, url, secure) {
     const t = await env.DB.prepare('SELECT * FROM tenants WHERE id = ?').bind(Number(tm[1])).first();
     if (!t) return err('Assinante não encontrado.', 404);
     if (clean(d.confirm, 40) !== t.slug) return err('Digite o link da página para confirmar a exclusão.');
+    const kids = await env.DB.prepare('SELECT id FROM tenants WHERE parent_id = ?').bind(t.id).all();
+    for (const k of kids.results) {
+      const km = await env.DB.prepare('SELECT id FROM media WHERE tenant_id = ?').bind(k.id).all();
+      for (const x of km.results) { try { await env.MEDIA.delete(`m/${x.id}`); } catch (_) {} }
+      await env.DB.batch(['media', 'events', 'bookings', 'pages'].map((tb) => env.DB.prepare(`DELETE FROM ${tb} WHERE tenant_id = ?`).bind(k.id)).concat([env.DB.prepare('DELETE FROM tenants WHERE id = ?').bind(k.id)]));
+    }
     const media = await env.DB.prepare('SELECT id FROM media WHERE tenant_id = ?').bind(t.id).all();
     for (const x of media.results) { try { await env.MEDIA.delete(`m/${x.id}`); } catch (_) {} }
     await env.DB.batch([
@@ -425,9 +504,9 @@ async function adminApi(request, env, url, secure) {
     return json({ ok: true });
   }
   if (tm && tm[2] && m === 'POST') {
-    const t = await env.DB.prepare('SELECT id FROM tenants WHERE id = ?').bind(Number(tm[1])).first();
+    const t = await env.DB.prepare('SELECT id, parent_id FROM tenants WHERE id = ?').bind(Number(tm[1])).first();
     if (!t) return err('Assinante não encontrado.', 404);
-    const token = await createSession(env, { tenantId: t.id });
+    const token = await createSession(env, { tenantId: t.id, accountId: t.parent_id || t.id });
     return json({ ok: true }, 200, { 'Set-Cookie': cookie('ss_sess', token, { secure }) });
   }
   return err('Rota não encontrada.', 404);
