@@ -40,7 +40,7 @@
   const money = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const num = (n) => (n || 0).toLocaleString('pt-BR');
   const phone = (p) => { p = String(p || '').replace(/\D/g, ''); if (p.startsWith('55') && p.length >= 12) p = p.slice(2); return p.length >= 10 ? `(${p.slice(0, 2)}) ${p.slice(2, p.length - 4)}-${p.slice(-4)}` : p; };
-  const STL = { trial: 'Teste', active: 'Ativo', blocked: 'Bloqueado', expired: 'Teste vencido' };
+  const STL = { trial: 'Teste', active: 'Ativo', blocked: 'Fora do ar', expired: 'Teste vencido' };
 
   function loginView(msg) {
     const form = h('form', { class: 'form', novalidate: true },
@@ -115,7 +115,7 @@
     const statusCard = h('div', { class: 'promo' },
       h('h3', {}, 'Receita mensal estimada'),
       h('div', { style: 'font:700 40px Space Grotesk,sans-serif;position:relative' }, money(T.mrr)),
-      h('p', {}, `${T.active} ativos · ${T.trial} em teste · ${T.expired} com teste vencido · ${T.blocked} bloqueados`),
+      h('p', {}, `${T.active} ativos · ${T.trial} em teste · ${T.expired} com teste vencido · ${T.blocked} fora do ar`),
       h('div', { class: 'row' }, h('a', { href: '#assinantes', class: 'btn btn-sky' }, 'Gerenciar assinantes')));
     holder.replaceWith(
       h('div', { class: 'ov' },
@@ -141,36 +141,75 @@
     const box = h('div'); frame(box);
     let d;
     try { d = await api('/api/admin/tenants'); } catch (e) { if (e.status === 401) return loginView(); return; }
+    A.list = d;
     const search = h('input', { type: 'search', placeholder: 'Buscar por nome, link, telefone ou e-mail', 'aria-label': 'Buscar assinante', class: 'search' });
-    const tbody = h('tbody');
+    A.f = A.f || 'todos';
+    const FIL = { todos: 'Todos', active: 'Ativos', trial: 'Em teste', expired: 'Teste vencido', blocked: 'Fora do ar' };
+    const listEl = h('div', { class: 'subs' });
+    const chips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Filtrar' }, Object.entries(FIL).map(([k, l]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(A.f === k), onclick: (e) => { A.f = k; chips.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c === e.currentTarget))); draw(); } }, l)));
     const draw = () => {
       const q = search.value.trim().toLowerCase(); const qd = q.replace(/\D/g, '');
-      tbody.replaceChildren(...d.tenants.filter((t) => !q || [t.business_name, t.slug, t.email, t.owner_name].join(' ').toLowerCase().includes(q) || (qd.length > 3 && String(t.whatsapp).includes(qd))).map(row));
+      const rows = d.tenants.filter((t) => (A.f === 'todos' || t.state === A.f) && (!q || [t.business_name, t.slug, t.email, t.owner_name].join(' ').toLowerCase().includes(q) || (qd.length > 3 && String(t.whatsapp).includes(qd))));
+      listEl.replaceChildren(...(rows.length ? rows.map(row) : [h('div', { class: 'empty' }, 'Nenhum assinante encontrado.')]));
     };
     search.addEventListener('input', draw);
     function row(t) {
-      const status = h('select', { 'aria-label': 'Status de ' + t.business_name }, [['trial', 'Teste'], ['active', 'Ativo'], ['blocked', 'Bloqueado']].map(([v, l]) => h('option', { value: v, selected: t.status === v }, l)));
-      const plan = h('select', { 'aria-label': 'Plano de ' + t.business_name }, Object.values(d.plans).map((p) => h('option', { value: p.id, selected: t.plan === p.id }, p.name)));
-      const paid = h('input', { type: 'date', value: (t.paid_until || '').slice(0, 10), 'aria-label': 'Pago até' });
-      const trial = h('input', { type: 'date', value: (t.trial_ends || '').slice(0, 10), 'aria-label': 'Teste até' });
-      const save = async (extra = {}) => {
-        try { await api('/api/admin/tenants/' + t.id, { method: 'PATCH', body: JSON.stringify({ status: status.value, plan: plan.value, paid_until: paid.value, trial_ends: trial.value, ...extra }) }); toast('Salvo.'); viewAssinantes(); }
-        catch (e) { toast(e.message, true); }
+      return h('article', { class: 'subc' },
+        h('div', { class: 'who' }, h('span', { class: 'sq' }, (t.business_name || '?')[0].toUpperCase()),
+          h('div', { style: 'min-width:0' }, h('b', {}, t.business_name), h('small', { style: 'display:block' }, `${t.owner_name} · ${phone(t.whatsapp)}`), h('a', { href: t.url, target: '_blank', rel: 'noopener', class: 'sub-link' }, t.slug + ' ↗'))),
+        h('div', { class: 'sub-tags' },
+          h('span', { class: 'pill ' + t.state, style: 'margin:0' }, STL[t.state] || t.state),
+          h('span', { class: 'pill tier-' + t.tier, style: 'margin:0' }, (d.tiers[t.tier] || t.tier)),
+          h('span', { class: 'pill', style: 'margin:0;background:#F2F2F2' }, d.plans[t.plan]?.name || t.plan)),
+        h('div', { class: 'sub-nums' }, h('span', {}, h('b', {}, num(t.views30)), ' visitas'), h('span', {}, h('b', {}, num(t.bookings)), ' agend.'), h('span', { class: 'muted' }, 'desde ' + fmt(t.created_at))),
+        t.admin_note ? h('p', { class: 'sub-note' }, '“' + t.admin_note + '”') : null,
+        h('div', { class: 'sub-act' }, h('button', { class: 'btn btn-main btn-sm', type: 'button', onclick: () => manage(t) }, 'Gerenciar')));
+    }
+    function manage(t) {
+      const sel = (name, opts, val, label) => h('div', { class: 'f' }, h('label', { for: 'm_' + name }, label), h('select', { id: 'm_' + name, name }, opts.map(([v, l]) => h('option', { value: v, selected: v === val }, l))));
+      const date = (name, val, label) => h('div', { class: 'f' }, h('label', { for: 'm_' + name }, label), h('input', { id: 'm_' + name, name, type: 'date', value: (val || '').slice(0, 10) }));
+      const form = h('form', { class: 'formgrid' },
+        sel('status', [['active', 'Ativo (no ar)'], ['trial', 'Teste grátis'], ['blocked', 'Fora do ar']], t.status, 'Situação'),
+        sel('tier', Object.entries(d.tiers), t.tier, 'Plano'),
+        sel('plan', Object.values(d.plans).map((p) => [p.id, p.name]), t.plan, 'Cobrança'),
+        date('paid_until', t.paid_until, 'Pago até'),
+        date('trial_ends', t.trial_ends, 'Teste grátis até'),
+        h('div', { class: 'f' }, h('label', { for: 'm_np' }, 'Nova senha (opcional)'), h('input', { id: 'm_np', name: 'new_password', type: 'text', maxlength: 8, placeholder: '4 a 8 caracteres', autocomplete: 'off' })),
+        h('div', { class: 'f', style: 'grid-column:1/-1' }, h('label', { for: 'm_note' }, 'Motivo / observação'), h('textarea', { id: 'm_note', name: 'note', rows: 2, placeholder: 'Ex.: pagou o plano anual pelo Pix em 26/11' })));
+      const logEl = h('ul', { class: 'log' }, h('li', { class: 'muted' }, 'Carregando histórico…'));
+      api('/api/admin/tenants/' + t.id + '/log').then((r) => { logEl.replaceChildren(...(r.log.length ? r.log.map((x) => h('li', {}, h('b', {}, x.action), x.note ? h('span', {}, ' — ' + x.note) : null, h('small', {}, fmt(x.created_at) + ' ' + x.created_at.slice(11, 16)))) : [h('li', { class: 'muted' }, 'Nenhuma alteração registrada.')])); }).catch(() => {});
+      const close = () => { modal.remove(); document.removeEventListener('keydown', esc); };
+      const esc = (e) => { if (e.key === 'Escape') close(); };
+      const save = async () => {
+        const v = Object.fromEntries(new FormData(form));
+        if (!v.new_password) delete v.new_password;
+        if (v.status !== t.status && !v.note.trim() && !confirm('Salvar sem escrever o motivo?')) return;
+        try { await api('/api/admin/tenants/' + t.id, { method: 'PATCH', body: JSON.stringify(v) }); toast('Salvo.'); close(); viewAssinantes(); } catch (e) { toast(e.message, true); }
       };
-      return h('tr', {},
-        h('td', {}, h('div', { class: 'who' }, h('span', { class: 'sq' }, (t.business_name || '?')[0].toUpperCase()), h('div', {}, h('b', {}, t.business_name), h('small', {}, t.owner_name), h('small', { style: 'display:block' }, phone(t.whatsapp) + (t.email ? ' · ' + t.email : ''))))),
-        h('td', {}, h('a', { href: t.url, target: '_blank', rel: 'noopener' }, t.slug), h('div', {}, h('span', { class: 'pill ' + t.state, style: 'margin:4px 0 0' }, STL[t.state] || t.state))),
-        h('td', {}, status), h('td', {}, plan), h('td', {}, trial), h('td', {}, paid),
-        h('td', {}, num(t.views30)), h('td', {}, num(t.bookings)), h('td', {}, fmt(t.created_at)),
-        h('td', {}, h('div', { class: 'row', style: 'gap:6px;flex-wrap:nowrap' },
-          h('button', { class: 'btn btn-main btn-sm', type: 'button', onclick: () => save() }, 'Salvar'),
-          h('button', { class: 'btn btn-line btn-sm', type: 'button', title: 'Abrir o painel desta conta', onclick: async () => { await api('/api/admin/tenants/' + t.id + '/impersonate', { method: 'POST' }); window.open('/painel', '_blank'); } }, 'Entrar'),
-          h('button', { class: 'btn btn-line btn-sm', type: 'button', onclick: () => { const np = prompt('Nova senha para ' + t.business_name + ' (4 a 8 caracteres):'); if (np) save({ new_password: np }); } }, 'Senha'))));
+      const del = async () => {
+        const c = prompt(`Excluir "${t.business_name}" apaga a página, pedidos, fotos e vídeos para sempre. Isso não pode ser desfeito.\n\nPara confirmar, digite o link: ${t.slug}`);
+        if (c == null) return;
+        try { await api('/api/admin/tenants/' + t.id, { method: 'DELETE', body: JSON.stringify({ confirm: c.trim(), note: form.querySelector('[name=note]').value }) }); toast('Conta excluída.'); close(); viewAssinantes(); } catch (e) { toast(e.message, true); }
+      };
+      const modal = h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mT', onclick: (e) => { if (e.target === modal) close(); } },
+        h('div', { class: 'modal-card' },
+          h('div', { class: 'modal-h' }, h('div', {}, h('h2', { id: 'mT' }, t.business_name), h('p', { class: 'muted', style: 'margin:2px 0 0' }, `${t.owner_name} · ${phone(t.whatsapp)}${t.email ? ' · ' + t.email : ''}`)), h('button', { class: 'tbtn', type: 'button', 'aria-label': 'Fechar', onclick: close }, '✕')),
+          form,
+          h('div', { class: 'row', style: 'justify-content:space-between;gap:10px' },
+            h('div', { class: 'row', style: 'gap:8px' },
+              h('button', { class: 'btn btn-line btn-sm', type: 'button', onclick: async () => { await api('/api/admin/tenants/' + t.id + '/impersonate', { method: 'POST' }); window.open('/painel', '_blank'); } }, 'Entrar no painel'),
+              h('a', { class: 'btn btn-line btn-sm', href: t.url, target: '_blank', rel: 'noopener' }, 'Ver página'),
+              h('button', { class: 'btn btn-danger btn-sm', type: 'button', onclick: del }, 'Excluir conta')),
+            h('button', { class: 'btn btn-main', type: 'button', onclick: save }, 'Salvar')),
+          h('div', {}, h('h3', { style: 'margin:6px 0 8px;font:500 16px Outfit,sans-serif' }, 'Histórico'), logEl)));
+      document.addEventListener('keydown', esc);
+      document.body.append(modal);
+      setTimeout(() => form.querySelector('select').focus(), 50);
     }
     const s = d.summary;
     box.append(top('Assinantes', `${s.total} no total · ${s.active} ativos · ${s.trial} em teste`),
-      h('div', { class: 'row', style: 'margin:0 0 14px;justify-content:space-between;align-items:center' }, search, h('span', { class: 'muted small' }, 'Altere status, plano e datas e clique em Salvar.')),
-      h('div', { class: 'table-wrap' }, h('table', {}, h('thead', {}, h('tr', {}, ['Assinante', 'Link', 'Status', 'Plano', 'Teste até', 'Pago até', 'Visitas 30d', 'Agend.', 'Criado', ''].map((c) => h('th', { scope: 'col' }, c)))), tbody)));
+      h('div', { class: 'row', style: 'margin:0 0 12px;gap:10px;align-items:center;flex-wrap:wrap' }, search, chips),
+      listEl);
     draw();
   }
 

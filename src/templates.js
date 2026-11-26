@@ -7,13 +7,13 @@ const shell = (title, bodyHtml, { scripts = '', desc = '', headExtra = '' } = {}
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${e(title)}</title>
 ${desc ? `<meta name="description" content="${e(desc)}">` : ''}
-<meta name="theme-color" content="#0E0B12">
+<meta name="theme-color" content="#ECECEC">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/app.css">
 <link rel="icon" href="/favicon.ico">
 ${headExtra}
@@ -24,7 +24,7 @@ ${scripts}
 </body>
 </html>`;
 
-const logo = (brand) => `<a href="/" class="brand"><span class="brand-dot" aria-hidden="true"></span>${e(brand)}</a>`;
+const logo = (brand) => `<a href="/" class="brand"><span class="brand-dot" aria-hidden="true">${e(brand.slice(0, 1).toUpperCase())}</span>${e(brand)}</a>`;
 const I = {
   check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>',
   cal: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>',
@@ -56,7 +56,7 @@ export function landingPage({ brand, trialDays, demo }) {
 <h1>Seu site lindo, com <span class="hl">agendamento</span> e métricas. Sem depender de ninguém.</h1>
 <p class="lead">Monte sua página em minutos, mostre seus trabalhos em carrosséis animados e receba agendamentos direto no WhatsApp.</p>
 <div class="row"><a href="/cadastro" class="btn btn-main btn-lg">Começar grátis</a><a href="${e(demo)}" class="btn btn-line btn-lg" target="_blank" rel="noopener">Ver exemplo real</a></div>
-<p class="fine">Sem cartão de crédito. Pronto em 2 minutos.</p>
+<div class="hero-stats"><div><b>2</b><span>minutos para criar</span></div><div><b>${trialDays}</b><span>dias grátis</span></div><div><b>0</b><span>cartão de crédito</span></div></div>
 </div>
 <div class="hero-phone" id="exemplo">
 <a class="device" href="${e(demo)}" target="_blank" rel="noopener" aria-label="Abrir a página de exemplo da Vitória Carvalho">
@@ -67,13 +67,13 @@ export function landingPage({ brand, trialDays, demo }) {
 </div>
 </section>
 <section id="recursos" class="wrap sec">
-<h2 class="h2">Tudo que o seu negócio precisa numa página só</h2>
-<div class="grid3">${features.map(([ic, t, d]) => `<div class="feat"><span class="feat-ic">${ic}</span><h3>${e(t)}</h3><p>${e(d)}</p></div>`).join('')}</div>
+<div class="sec-head"><h2 class="h2">Tudo numa página só</h2><a href="/cadastro" class="btn btn-main btn-sm">Começar grátis</a></div>
+<div class="grid3">${features.map(([ic, t, d]) => `<div class="feat-wrap"><div class="feat"><span class="feat-ic">${ic}</span><h3>${e(t)}</h3><p>${e(d)}</p></div><a class="corner" href="/cadastro" aria-label="Começar grátis: ${e(t)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 17L17 7M8 7h9v9"/></svg></a></div>`).join('')}</div>
 </section>
 <section class="wrap sec">
 <div class="cta-box">
 <div>
-<h2 class="h2" style="margin-bottom:10px">Tudo incluso, sem complicação</h2>
+<h2 class="h2" style="margin-bottom:10px">Tudo incluso</h2>
 <p class="muted" style="margin:0">Comece grátis por ${trialDays} dias com todos os recursos liberados.</p>
 </div>
 <ul class="incl">${included.map((x) => `<li>${I.check} ${e(x)}</li>`).join('')}</ul>
@@ -81,7 +81,7 @@ export function landingPage({ brand, trialDays, demo }) {
 </div>
 </section>
 <section class="wrap sec faq">
-<h2 class="h2">Perguntas frequentes</h2>
+<h2 class="h2" style="margin-bottom:18px">Perguntas frequentes</h2>
 <details><summary>Preciso saber programar?</summary><p>Não. Você edita tudo pelo painel, com formulários simples e uma prévia ao vivo.</p></details>
 <details><summary>Como as clientes agendam?</summary><p>Elas tocam em "Agendar", escolhem serviço, data e horário. O pedido aparece no seu painel e abre o WhatsApp com a mensagem pronta.</p></details>
 <details><summary>Posso usar no link da bio do Instagram?</summary><p>Sim. Seu endereço fica com o nome do seu negócio.</p></details>
@@ -182,7 +182,7 @@ ${logo(brand)}
 
 export function appShell({ brand, kind }) {
   const isAdmin = kind === 'admin';
-  const pwa = isAdmin ? '' : `<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icons/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="${e(brand)}"><meta name="apple-mobile-web-app-status-bar-style" content="black">`;
+  const pwa = isAdmin ? '' : `<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icons/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="${e(brand)}"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="mobile-web-app-capable" content="yes">`;
   return shell(`${isAdmin ? 'Admin' : 'Painel'} · ${brand}`, `<div id="app" data-brand="${e(brand)}"><p class="loading">Carregando…</p></div>`,
-    { headExtra: `${pwa}<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/static/panel.css">`, scripts: `<script src="/static/${isAdmin ? 'admin' : 'panel'}.js" defer></script>` });
+    { headExtra: `${pwa}<link rel="stylesheet" href="/static/panel.css">`, scripts: `<script src="/static/${isAdmin ? 'admin' : 'panel'}.js" defer></script>` });
 }

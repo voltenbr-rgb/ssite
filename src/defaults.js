@@ -5,6 +5,7 @@ export const PLANS = {
   anual: { id: 'anual', name: 'Anual', price: 399, period: 'ano', note: 'Equivale a R$ 33,25/mês · 2 meses grátis' },
 };
 export const TRIAL_DAYS = 7;
+export const TIERS = { completo: 'Completo', simples: 'Simples' };
 
 export const SEGMENTS = ['Beleza e estética', 'Cílios e sobrancelhas', 'Unhas', 'Cabelo', 'Barbearia', 'Maquiagem', 'Saúde', 'Fitness', 'Outro'];
 

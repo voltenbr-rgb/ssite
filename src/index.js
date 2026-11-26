@@ -1,7 +1,7 @@
 // ssite — Worker principal (Cloudflare Workers + D1 + KV)
 import { hashPassword, verifyPassword, createSession, readSession, destroySession, cookie, randomToken } from './auth.js';
 import { renderPage, TEMPLATES, templateList } from './render.js';
-import { defaultConfig, PLANS, TRIAL_DAYS, SEGMENTS } from './defaults.js';
+import { defaultConfig, PLANS, TRIAL_DAYS, SEGMENTS, TIERS } from './defaults.js';
 import { landingPage, signupPage, loginPage, appShell } from './templates.js';
 
 const RESERVED = new Set(['www', 'app', 'api', 'admin', 'painel', 'static', 'seed', 'm', 's', 'cadastro', 'entrar', 'sair', 'suporte', 'blog', 'mail', 'email', 'ajuda', 'planos', 'ssite']);
@@ -50,6 +50,7 @@ const publicTenant = (t, env, url) => ({
   id: t.id, slug: t.slug, business_name: t.business_name, owner_name: t.owner_name, username: t.username, email: t.email,
   whatsapp: t.whatsapp, segment: t.segment, plan: t.plan, status: t.status, state: tenantState(t),
   trial_ends: t.trial_ends, paid_until: t.paid_until, created_at: t.created_at, url: publicUrl(env, url, t.slug),
+  tier: t.tier || 'completo',
 });
 
 async function getTenantBySlug(env, slug) {
@@ -362,9 +363,9 @@ async function adminApi(request, env, url, secure) {
       (SELECT COUNT(*) FROM events e WHERE e.tenant_id = t.id AND e.type = 'view' AND e.day >= ?) AS views30,
       (SELECT COUNT(*) FROM bookings b WHERE b.tenant_id = t.id) AS bookings
       FROM tenants t ORDER BY t.created_at DESC`).bind(from).all();
-    const list = r.results.map((t) => ({ ...publicTenant(t, env, url), views30: t.views30, bookings: t.bookings }));
+    const list = r.results.map((t) => ({ ...publicTenant(t, env, url), views30: t.views30, bookings: t.bookings, admin_note: t.admin_note || '' }));
     const mrr = list.filter((t) => t.state === 'active').reduce((s, t) => s + (t.plan === 'anual' ? PLANS.anual.price / 12 : PLANS.mensal.price), 0);
-    return json({ tenants: list, plans: PLANS, summary: { total: list.length, active: list.filter((t) => t.state === 'active').length, trial: list.filter((t) => t.state === 'trial').length, mrr } });
+    return json({ tenants: list, plans: PLANS, tiers: TIERS, summary: { total: list.length, active: list.filter((t) => t.state === 'active').length, trial: list.filter((t) => t.state === 'trial').length, mrr } });
   }
   const tm = p.match(/^\/api\/admin\/tenants\/(\d+)(\/impersonate)?$/);
   if (tm && m === 'PATCH') {
@@ -374,18 +375,53 @@ async function adminApi(request, env, url, secure) {
     const status = ['trial', 'active', 'blocked'].includes(d.status) ? d.status : t.status;
     const plan = PLANS[d.plan] ? d.plan : t.plan;
     const paid = d.paid_until === '' ? null : /^\d{4}-\d{2}-\d{2}$/.test(d.paid_until || '') ? d.paid_until : t.paid_until;
-    const trial = /^\d{4}-\d{2}-\d{2}$/.test(d.trial_ends || '') ? d.trial_ends + 'T23:59:59.000Z' : t.trial_ends;
+    const trial = /^\d{4}-\d{2}-\d{2}$/.test(d.trial_ends || '') && d.trial_ends !== (t.trial_ends || '').slice(0, 10) ? d.trial_ends + 'T23:59:59.000Z' : t.trial_ends;
     let slug = t.slug;
     if (d.slug && d.slug !== t.slug) {
       slug = slugify(d.slug);
       if (!validSlug(slug)) return err('Endereço inválido.');
       if (await getTenantBySlug(env, slug)) return err('Esse endereço já está em uso.', 409);
     }
-    await env.DB.prepare('UPDATE tenants SET status = ?, plan = ?, paid_until = ?, trial_ends = ?, slug = ? WHERE id = ?').bind(status, plan, paid, trial, slug, t.id).run();
+    const tier = TIERS[d.tier] ? d.tier : (t.tier || 'completo');
+    const note = clean(d.note, 500);
+    await env.DB.prepare('UPDATE tenants SET status = ?, plan = ?, tier = ?, paid_until = ?, trial_ends = ?, slug = ?, admin_note = COALESCE(?, admin_note) WHERE id = ?').bind(status, plan, tier, paid, trial, slug, note || null, t.id).run();
+    const STL = { trial: 'Teste', active: 'Ativo', blocked: 'Fora do ar' };
+    const changes = [];
+    if (status !== t.status) changes.push(`Status: ${STL[t.status] || t.status} → ${STL[status]}`);
+    if (tier !== (t.tier || 'completo')) changes.push(`Plano: ${TIERS[t.tier || 'completo']} → ${TIERS[tier]}`);
+    if (plan !== t.plan) changes.push(`Cobrança: ${PLANS[t.plan]?.name || t.plan} → ${PLANS[plan].name}`);
+    if ((paid || '').slice(0, 10) !== (t.paid_until || '').slice(0, 10)) changes.push(`Pago até: ${paid ? paid.split('-').reverse().join('/') : '—'}`);
+    if (trial !== t.trial_ends) changes.push(`Teste até: ${(trial || '').slice(0, 10).split('-').reverse().join('/')}`);
+    if (slug !== t.slug) changes.push(`Link: ${t.slug} → ${slug}`);
+    if (d.new_password) changes.push('Senha redefinida');
+    if (changes.length || note) await env.DB.prepare('INSERT INTO admin_log (tenant_id, tenant, action, note) VALUES (?, ?, ?, ?)').bind(t.id, t.business_name, changes.join(' · ') || 'Observação', note || null).run();
     if (d.new_password) {
       if (passError(String(d.new_password))) return err(passError(String(d.new_password)));
       await env.DB.prepare('UPDATE tenants SET password_hash = ? WHERE id = ?').bind(await hashPassword(String(d.new_password)), t.id).run();
     }
+    return json({ ok: true });
+  }
+  const lg = p.match(/^\/api\/admin\/tenants\/(\d+)\/log$/);
+  if (lg && m === 'GET') {
+    const r = await env.DB.prepare('SELECT action, note, created_at FROM admin_log WHERE tenant_id = ? ORDER BY id DESC LIMIT 30').bind(Number(lg[1])).all();
+    return json({ log: r.results });
+  }
+  if (tm && !tm[2] && m === 'DELETE') {
+    const d = await body(request);
+    const t = await env.DB.prepare('SELECT * FROM tenants WHERE id = ?').bind(Number(tm[1])).first();
+    if (!t) return err('Assinante não encontrado.', 404);
+    if (clean(d.confirm, 40) !== t.slug) return err('Digite o link da página para confirmar a exclusão.');
+    const media = await env.DB.prepare('SELECT id FROM media WHERE tenant_id = ?').bind(t.id).all();
+    for (const x of media.results) { try { await env.MEDIA.delete(`m/${x.id}`); } catch (_) {} }
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM media WHERE tenant_id = ?').bind(t.id),
+      env.DB.prepare('DELETE FROM events WHERE tenant_id = ?').bind(t.id),
+      env.DB.prepare('DELETE FROM bookings WHERE tenant_id = ?').bind(t.id),
+      env.DB.prepare('DELETE FROM pages WHERE tenant_id = ?').bind(t.id),
+      env.DB.prepare('DELETE FROM sessions WHERE tenant_id = ?').bind(t.id),
+      env.DB.prepare('DELETE FROM tenants WHERE id = ?').bind(t.id),
+      env.DB.prepare('INSERT INTO admin_log (tenant_id, tenant, action, note) VALUES (?, ?, ?, ?)').bind(t.id, t.business_name, `Conta excluída (${t.slug})`, clean(d.note, 500) || null),
+    ]);
     return json({ ok: true });
   }
   if (tm && tm[2] && m === 'POST') {
@@ -414,10 +450,10 @@ export default {
         const B = brand(env);
         return new Response(JSON.stringify({
           name: `${B} · Painel`, short_name: B, description: 'Seu painel: agendamentos, métricas e edição da sua página.',
-          id: '/painel', start_url: '/painel', scope: '/', display: 'standalone', background_color: '#E8F0FA', theme_color: '#1A1A1C', lang: 'pt-BR',
+          id: '/painel', start_url: '/painel', scope: '/', display: 'standalone', orientation: 'any', background_color: '#ECECEC', theme_color: '#ECECEC', lang: 'pt-BR',
           icons: [
             { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
             { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
           ],
           shortcuts: [
