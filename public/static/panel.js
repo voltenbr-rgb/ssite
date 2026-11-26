@@ -51,6 +51,7 @@
     wave: '<path d="M2 12c3-4 5-4 8 0s5 4 8 0 3-2 4-2"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
+    layout: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/>',
     download: '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/>',
     gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8c-2-4-6-4-6-1s6 1 6 1 6 2 6-1-4-3-6 1"/>',
   };
@@ -73,6 +74,17 @@
   const waNum = (p) => { p = String(p || '').replace(/\D/g, ''); return p.startsWith('55') ? p : '55' + p; };
   const get = (obj, path) => path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
   const set = (obj, path, val) => { const ks = path.split('.'); let o = obj; ks.slice(0, -1).forEach((k) => { if (o[k] == null || typeof o[k] !== 'object') o[k] = {}; o = o[k]; }); o[ks[ks.length - 1]] = val; };
+
+  function pwStrength(v) {
+    if (!v) return null;
+    if (v.length < 4) return ['Muito curta', '#D64545', 15];
+    let sc = 0;
+    if (v.length >= 6) sc++; if (v.length >= 8) sc++;
+    if (/[a-zA-Z]/.test(v) && /\d/.test(v)) sc++;
+    if (/[^a-zA-Z0-9]/.test(v) || (/[a-z]/.test(v) && /[A-Z]/.test(v))) sc++;
+    if (/^(\d)\1+$/.test(v) || /^(0123|1234|2345|3456|4567|5678|6789)/.test(v)) sc = 0;
+    return sc <= 1 ? ['Senha fraca · misture letras e números', '#D64545', 33] : sc === 2 ? ['Senha média', '#D99A1E', 66] : ['Senha forte', '#2E9E5B', 100];
+  }
 
   /* ---------- app instalável (PWA) ---------- */
   const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -398,6 +410,7 @@
   ];
   const T = (path, label, opts = {}) => ({ type: opts.area ? 'textarea' : 'text', path, label, ...opts });
   const SECTIONS = [
+    { key: 'template', title: 'Modelo da página', ic: IC.layout, fields: [{ type: 'template' }] },
     { key: 'theme', title: 'Cores', ic: IC.palette, fields: [{ type: 'theme' }] },
     { key: 'brand', title: 'Nome e menu', ic: IC.tag, fields: [T('brand.name', 'Nome que aparece no topo'), T('brand.tagline', 'Subtítulo pequeno', { hint: 'Ex.: Lash Designer' })] },
     { key: 'hero', title: 'Capa', ic: IC.home, fields: [
@@ -524,6 +537,21 @@
     draw();
     return wrap;
   }
+  function fieldTemplate(obj) {
+    const wrap = h('div', { class: 'f' }, h('p', { class: 'muted', style: 'margin:0' }, 'Carregando modelos…'));
+    (async () => {
+      if (!S.templates) S.templates = (await api('/api/templates')).templates;
+      const draw = () => {
+        const cur = obj.template || S.templates[0]?.id;
+        wrap.replaceChildren(h('small', {}, 'Seus textos, fotos e serviços continuam iguais. Só muda o visual.'),
+          h('div', { class: 'tpl-grid', role: 'radiogroup', 'aria-label': 'Modelo da página' }, S.templates.map((t) => h('button', { type: 'button', class: 'tpl', role: 'radio', 'aria-checked': String(t.id === cur), onclick: () => { obj.template = t.id; changed(); draw(); } },
+            h('span', { class: 'tpl-img' }, h('img', { src: t.thumb, alt: '' })), h('b', {}, t.name), h('small', {}, t.desc)))),
+          S.templates.length === 1 ? h('small', {}, 'Novos modelos aparecem aqui assim que forem lançados.') : null);
+      };
+      draw();
+    })();
+    return wrap;
+  }
   function fieldList(obj, f) {
     const wrap = h('div', { class: 'f' });
     const open = new Set();
@@ -562,6 +590,7 @@
       case 'strings': return fieldStrings(obj, f);
       case 'weekdays': return fieldWeekdays(obj, f);
       case 'theme': return fieldTheme(obj);
+      case 'template': return fieldTemplate(obj);
       case 'list': return fieldList(obj, f);
       default: return h('span');
     }
@@ -630,16 +659,19 @@
     const slugField = h('div', { class: 'f', style: 'grid-column:1/-1' }, h('label', { for: 'c_slug' }, 'Link da sua página'),
       h('div', { class: 'slug-row' }, slugIn, root ? h('span', { class: 'slug-sfx' }, '.' + root) : null),
       h('span', { id: 'c_slug_prev', class: 'url-prev' }, 'Sua página: ', slugPrev), slugMsg,
-      h('small', {}, `Para entrar no painel, use seu e-mail ou o nome do link (hoje: ${me.username}).`));
+      h('small', {}, `Para entrar no painel, use seu telefone, e-mail ou o nome do link (${me.username}).`));
     const form = h('form', { class: 'card', style: 'display:flex;flex-direction:column;gap:14px;margin-bottom:16px' },
       h('h2', {}, 'Seus dados'),
       h('div', { class: 'formgrid' }, F('business_name', 'Nome do negócio', me.business_name), F('owner_name', 'Seu nome', me.owner_name), F('email', 'E-mail', me.email, { type: 'email' }), F('whatsapp', 'WhatsApp', phoneFmt(me.whatsapp), { inputmode: 'tel' }), h('div', { class: 'f' }, h('label', { for: 'c_segment' }, 'Segmento'), segSel),
         slugField),
       h('div', {}, h('button', { class: 'btn btn-main', type: 'submit' }, 'Salvar dados')));
     form.addEventListener('submit', async (e) => { e.preventDefault(); try { const d = Object.fromEntries(new FormData(form)); d.slug = slugify(d.slug || me.slug); const changedSlug = d.slug !== me.slug; await api('/api/me', { method: 'PUT', body: JSON.stringify(d) }); await loadMe(); toast(changedSlug ? 'Link da página atualizado!' : 'Dados salvos.'); if (changedSlug) pageConta(); } catch (x) { toast(x.message, true); } });
+    const pwBar = h('span'), pwHint = h('small', { class: 'muted', 'aria-live': 'polite' }, 'De 4 a 8 caracteres.');
+    const pwMeter = h('div', {}, h('span', { class: 'pw-meter', 'aria-hidden': 'true' }, pwBar), pwHint);
     const pw = h('form', { class: 'card', style: 'display:flex;flex-direction:column;gap:14px;margin-bottom:16px' }, h('h2', {}, 'Trocar senha'),
-      h('div', { class: 'formgrid' }, F('current', 'Senha atual', '', { type: 'password', autocomplete: 'current-password' }), F('next', 'Nova senha (6+ caracteres)', '', { type: 'password', autocomplete: 'new-password' })),
+      h('div', { class: 'formgrid' }, F('current', 'Senha atual', '', { type: 'password', autocomplete: 'current-password' }), F('next', 'Nova senha (4 a 8 caracteres)', '', { type: 'password', autocomplete: 'new-password', maxlength: 8 })), pwMeter,
       h('div', {}, h('button', { class: 'btn btn-main', type: 'submit' }, 'Trocar senha')));
+    pw.querySelector('[name=next]').addEventListener('input', (e) => { const r = pwStrength(e.target.value); pwBar.style.width = r ? r[2] + '%' : '0'; pwBar.style.background = r ? r[1] : ''; pwHint.textContent = r ? r[0] : 'De 4 a 8 caracteres.'; });
     pw.addEventListener('submit', async (e) => { e.preventDefault(); try { await api('/api/me/password', { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(pw))) }); pw.reset(); toast('Senha alterada.'); } catch (x) { toast(x.message, true); } });
     const plan = S.plans[me.plan] || {};
     const STL = { trial: 'Teste grátis', active: 'Ativo', blocked: 'Bloqueado', expired: 'Teste encerrado' };

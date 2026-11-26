@@ -90,9 +90,10 @@ export function landingPage({ brand, trialDays, demo }) {
 </main>
 <footer class="foot"><div class="wrap foot-in">
 <div class="foot-l">${logo(brand)}<p class="muted small" style="margin:8px 0 0;max-width:460px">Seus dados, fotos e vídeos são protegidos e pertencem a você. Não vendemos nem compartilhamos as informações dos nossos clientes.</p></div>
-<span class="muted small">© ${year} ${e(brand)}. Todos os direitos reservados.</span>
+<div class="foot-r"><span class="muted small">© ${year} ${e(brand)}. Todos os direitos reservados.</span><a href="/admin" class="master-link">Área master</a></div>
 </div></footer>
 <script>
+try{navigator.sendBeacon('/api/site-event',new Blob([JSON.stringify({type:'landing',label:document.referrer?new URL(document.referrer).hostname:''})],{type:'application/json'}))}catch(_){}
 /* encaixa a página de exemplo (390×844) dentro da tela do celular, sem distorcer */
 (function(){var s=document.querySelector('.device-screen'),f=s&&s.querySelector('iframe');if(!f)return;
 function fit(){var k=s.clientWidth/390;f.style.transform='scale('+k+')';}
@@ -101,7 +102,7 @@ fit();if(window.ResizeObserver)new ResizeObserver(fit).observe(s);else addEventL
   { desc: 'Crie seu site com agendamento online, carrosséis de fotos e métricas. Comece grátis.' });
 }
 
-export function signupPage({ brand, segments, trialDays, root }) {
+export function signupPage({ brand, segments, trialDays, root, templates = [] }) {
   const suffix = root ? `.${root}` : '';
   const year = new Date().getFullYear();
   return shell(`Criar conta · ${brand}`, `
@@ -109,8 +110,8 @@ export function signupPage({ brand, segments, trialDays, root }) {
 <div class="auth-card">
 ${logo(brand)}
 <div class="steps-head">
-<p class="step-count" id="stepCount" aria-live="polite">Etapa 1 de 4</p>
-<div class="step-bar" aria-hidden="true"><span id="stepBar" style="width:25%"></span></div>
+<p class="step-count" id="stepCount" aria-live="polite">Etapa 1 de 5</p>
+<div class="step-bar" aria-hidden="true"><span id="stepBar" style="width:20%"></span></div>
 </div>
 <form id="signup" class="form" novalidate>
 
@@ -122,6 +123,11 @@ ${logo(brand)}
 </fieldset>
 
 <fieldset class="step" data-step="2" hidden>
+<legend><h1>Escolha o modelo</h1><p class="muted">Você pode trocar quando quiser, sem perder nada.</p></legend>
+<div class="models">${templates.map((t, i) => `<label class="model"><input type="radio" name="template" value="${e(t.id)}"${i === 0 ? ' checked' : ''}><span class="model-card"><span class="model-img"><img src="${e(t.thumb)}" alt="" loading="lazy"></span><span class="model-txt"><b>${e(t.name)}</b><small>${e(t.desc)}</small></span><span class="model-ok" aria-hidden="true">${I.check}</span></span></label>`).join('')}</div>
+</fieldset>
+
+<fieldset class="step" data-step="3" hidden>
 <legend><h1>O link da sua página</h1><p class="muted">É o endereço que você vai colocar na bio do Instagram.</p></legend>
 <label>Link da sua página
 <span class="slug-field"><input name="slug" required maxlength="30" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="seunegocio"><span class="slug-suffix">${e(suffix || ' (link)')}</span></span>
@@ -129,17 +135,19 @@ ${logo(brand)}
 <div class="url-card"><span class="muted small">Sua página vai ficar assim:</span><b id="slugPreview" data-root="${e(root)}">${root ? 'seunegocio.' + e(root) : 'seunegocio'}</b></div>
 </fieldset>
 
-<fieldset class="step" data-step="3" hidden>
+<fieldset class="step" data-step="4" hidden>
 <legend><h1>Seus dados</h1><p class="muted">Para os agendamentos chegarem até você.</p></legend>
 <label>Seu nome<input name="owner_name" required maxlength="80" autocomplete="name"></label>
 <label>WhatsApp<input name="whatsapp" required inputmode="tel" autocomplete="tel" placeholder="(67) 99999-9999"></label>
 <label>E-mail<input name="email" type="email" required autocomplete="email"></label>
 </fieldset>
 
-<fieldset class="step" data-step="4" hidden>
-<legend><h1>Crie sua senha</h1><p class="muted">Você vai usar para entrar no painel.</p></legend>
-<label>Senha<input name="password" type="password" required minlength="6" autocomplete="new-password"><small class="hint">Pelo menos 6 caracteres.</small></label>
-<label>Repita a senha<input name="password2" type="password" required minlength="6" autocomplete="new-password"></label>
+<fieldset class="step" data-step="5" hidden>
+<legend><h1>Crie sua senha</h1><p class="muted">Para entrar no painel com seu telefone ou e-mail.</p></legend>
+<label>Senha<input name="password" type="password" required minlength="4" maxlength="8" autocomplete="new-password" aria-describedby="pwHint">
+<span class="pw-meter" aria-hidden="true"><span id="pwBar"></span></span>
+<small class="hint" id="pwHint" aria-live="polite">De 4 a 8 caracteres.</small></label>
+<label>Repita a senha<input name="password2" type="password" required minlength="4" maxlength="8" autocomplete="new-password"></label>
 </fieldset>
 
 <p class="err" role="alert"></p>
@@ -161,7 +169,7 @@ export function loginPage({ brand }) {
 ${logo(brand)}
 <h1>Entrar</h1>
 <form id="login" class="form" novalidate>
-<label>Usuário ou e-mail<input name="login" required autocapitalize="off" autocomplete="username"></label>
+<label>Telefone, e-mail ou usuário<input name="login" required autocapitalize="off" autocomplete="username" placeholder="Ex.: (67) 99999-9999"></label>
 <label>Senha<input name="password" type="password" required autocomplete="current-password"></label>
 <p class="err" role="alert"></p>
 <button class="btn btn-main btn-block btn-lg" type="submit">Entrar</button>

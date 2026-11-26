@@ -1,6 +1,6 @@
 // ssite — Worker principal (Cloudflare Workers + D1 + KV)
 import { hashPassword, verifyPassword, createSession, readSession, destroySession, cookie, randomToken } from './auth.js';
-import { renderPage } from './render.js';
+import { renderPage, TEMPLATES, templateList } from './render.js';
 import { defaultConfig, PLANS, TRIAL_DAYS, SEGMENTS } from './defaults.js';
 import { landingPage, signupPage, loginPage, appShell } from './templates.js';
 
@@ -17,6 +17,12 @@ const slugify = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').
 const validSlug = (s) => /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/.test(s) && !RESERVED.has(s);
 const brDay = (d = new Date()) => new Date(d.getTime() - 4 * 3600 * 1000).toISOString().slice(0, 10); // America/Campo_Grande
 const clean = (v, max = 200) => String(v ?? '').trim().slice(0, max);
+const PASS_MIN = 4, PASS_MAX = 8;
+const passError = (pw) => (pw.length < PASS_MIN || pw.length > PASS_MAX ? `A senha precisa ter de ${PASS_MIN} a ${PASS_MAX} caracteres.` : '');
+const phoneKey = (v) => { const d = String(v || '').replace(/\D/g, ''); return d.length >= 10 && d.length <= 11 ? '55' + d : d; };
+async function siteEvent(env, type, label = '') {
+  try { await env.DB.prepare('INSERT INTO site_events (type, label, day) VALUES (?, ?, ?)').bind(type, label, brDay()).run(); } catch (_) {}
+}
 
 async function body(request) {
   const ct = request.headers.get('Content-Type') || '';
@@ -125,6 +131,13 @@ async function api(request, env, url) {
     return json({ ok: true });
   }
 
+  if (p === '/api/site-event' && m === 'POST') {
+    let d; try { d = JSON.parse(await request.text()); } catch { return new Response(null, { status: 204 }); }
+    if (['landing', 'signup_start', 'demo_click'].includes(d.type)) await siteEvent(env, d.type, clean(d.label, 60));
+    return new Response(null, { status: 204 });
+  }
+  if (p === '/api/templates' && m === 'GET') return json({ templates: templateList() });
+
   // ---- cadastro / login ----
   if (p === '/api/slug-check' && m === 'GET') {
     const s = slugify(url.searchParams.get('s'));
@@ -144,14 +157,17 @@ async function api(request, env, url) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return err('E-mail inválido.');
     if (whatsapp.length < 10) return err('WhatsApp inválido (use DDD).');
     if (!validSlug(slug)) return err('Endereço inválido. Use de 3 a 30 letras, números ou hífen.');
-    if (password.length < 6) return err('A senha precisa ter pelo menos 6 caracteres.');
+    if (passError(password)) return err(passError(password));
     const wa = whatsapp.startsWith('55') ? whatsapp : '55' + whatsapp;
-    const dup = await env.DB.prepare('SELECT slug, email, username FROM tenants WHERE slug = ? OR email = ? OR username = ?').bind(slug, email, slug).first();
-    if (dup) return err(dup.email === email ? 'Esse e-mail já tem cadastro. Entre na sua conta.' : 'Esse endereço já está em uso.', 409);
+    const dup = await env.DB.prepare('SELECT slug, email, username, whatsapp FROM tenants WHERE slug = ? OR email = ? OR username = ? OR whatsapp = ?').bind(slug, email, slug, wa).first();
+    if (dup) return err(dup.email === email ? 'Esse e-mail já tem cadastro. Entre na sua conta.' : dup.whatsapp === wa ? 'Esse WhatsApp já tem cadastro. Entre na sua conta.' : 'Esse link já está em uso.', 409);
     const trialEnds = new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString();
     const res = await env.DB.prepare('INSERT INTO tenants (slug, business_name, owner_name, username, email, whatsapp, segment, password_hash, plan, status, trial_ends) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id')
       .bind(slug, business, owner, slug, email, wa, clean(d.segment, 40), await hashPassword(password), plan, 'trial', trialEnds).first();
-    await env.DB.prepare('INSERT INTO pages (tenant_id, config) VALUES (?, ?)').bind(res.id, JSON.stringify(defaultConfig({ businessName: business, ownerName: owner, whatsapp: wa, city: clean(d.city, 60) }))).run();
+    const cfg0 = defaultConfig({ businessName: business, ownerName: owner, whatsapp: wa, city: clean(d.city, 60) });
+    if (TEMPLATES[d.template]) cfg0.template = d.template;
+    await env.DB.prepare('INSERT INTO pages (tenant_id, config) VALUES (?, ?)').bind(res.id, JSON.stringify(cfg0)).run();
+    await siteEvent(env, 'signup', slug);
     const token = await createSession(env, { tenantId: res.id });
     return json({ ok: true, slug }, 200, { 'Set-Cookie': cookie('ss_sess', token, { secure }) });
   }
@@ -159,7 +175,11 @@ async function api(request, env, url) {
     const d = await body(request);
     const login = clean(d.login, 120).toLowerCase();
     const key = slugify(login).replace(/-/g, ''); // "Vitória Carvalho" -> "vitoriacarvalho"
-    const t = await env.DB.prepare("SELECT * FROM tenants WHERE replace(lower(username), '-', '') = ? OR lower(email) = ? OR replace(slug, '-', '') = ? LIMIT 1").bind(key, login, key).first();
+    const digits = login.replace(/\D/g, '');
+    const isPhone = digits.length >= 10 && digits.length <= 13 && /^[\d\s()+.-]+$/.test(login);
+    const t = isPhone
+      ? await env.DB.prepare('SELECT * FROM tenants WHERE whatsapp = ? OR whatsapp = ? LIMIT 1').bind(phoneKey(digits), digits).first()
+      : await env.DB.prepare("SELECT * FROM tenants WHERE replace(lower(username), '-', '') = ? OR lower(email) = ? OR replace(slug, '-', '') = ? LIMIT 1").bind(key, login, key).first();
     if (!t || !(await verifyPassword(String(d.password || ''), t.password_hash))) return err('Usuário ou senha incorretos.', 401);
     const token = await createSession(env, { tenantId: t.id });
     return json({ ok: true }, 200, { 'Set-Cookie': cookie('ss_sess', token, { secure }) });
@@ -199,7 +219,7 @@ async function api(request, env, url) {
   if (p === '/api/me/password' && m === 'POST') {
     const d = await body(request);
     if (!(await verifyPassword(String(d.current || ''), t.password_hash))) return err('Senha atual incorreta.', 401);
-    if (String(d.next || '').length < 6) return err('A nova senha precisa ter pelo menos 6 caracteres.');
+    if (passError(String(d.next || ''))) return err(passError(String(d.next || '')));
     await env.DB.prepare('UPDATE tenants SET password_hash = ? WHERE id = ?').bind(await hashPassword(String(d.next)), t.id).run();
     return json({ ok: true });
   }
@@ -297,6 +317,45 @@ async function adminApi(request, env, url, secure) {
     await destroySession(env, request, 'ss_admin');
     return json({ ok: true }, 200, { 'Set-Cookie': cookie('ss_admin', '', { maxAge: 0, secure }) });
   }
+  if (p === '/api/admin/overview' && m === 'GET') {
+    const days = Math.min(90, Math.max(7, Number(url.searchParams.get('days')) || 30));
+    const from = brDay(new Date(Date.now() - (days - 1) * 86400000));
+    const [site, siteDay, ev, evDay, bkDay, tCount, recent, top, bkTotal] = await env.DB.batch([
+      env.DB.prepare('SELECT type, COUNT(*) AS n FROM site_events WHERE day >= ? GROUP BY type').bind(from),
+      env.DB.prepare('SELECT day, type, COUNT(*) AS n FROM site_events WHERE day >= ? GROUP BY day, type').bind(from),
+      env.DB.prepare('SELECT type, COUNT(*) AS n FROM events WHERE day >= ? GROUP BY type').bind(from),
+      env.DB.prepare("SELECT day, COUNT(*) AS n FROM events WHERE day >= ? AND type = 'view' GROUP BY day").bind(from),
+      env.DB.prepare("SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS n FROM bookings WHERE created_at >= ? GROUP BY day").bind(from),
+      env.DB.prepare('SELECT status, plan, trial_ends, COUNT(*) AS n FROM tenants GROUP BY status, plan, trial_ends < ?').bind(new Date().toISOString()),
+      env.DB.prepare('SELECT id, slug, business_name, owner_name, segment, whatsapp, status, trial_ends, created_at FROM tenants ORDER BY created_at DESC LIMIT 8'),
+      env.DB.prepare(`SELECT t.id, t.slug, t.business_name,
+        SUM(CASE WHEN e.type = 'view' THEN 1 ELSE 0 END) AS views,
+        SUM(CASE WHEN e.type IN ('whatsapp','booking_open') THEN 1 ELSE 0 END) AS clicks,
+        SUM(CASE WHEN e.type = 'booking' THEN 1 ELSE 0 END) AS bookings
+        FROM events e JOIN tenants t ON t.id = e.tenant_id WHERE e.day >= ? GROUP BY t.id ORDER BY views DESC LIMIT 6`).bind(from),
+      env.DB.prepare('SELECT COUNT(*) AS n FROM bookings'),
+    ]);
+    const now = new Date().toISOString();
+    const st = { total: 0, active: 0, trial: 0, expired: 0, blocked: 0, mrr: 0 };
+    for (const r of tCount.results) {
+      st.total += r.n;
+      const state = r.status === 'blocked' ? 'blocked' : r.status === 'trial' && r.trial_ends && r.trial_ends < now ? 'expired' : r.status;
+      st[state] = (st[state] || 0) + r.n;
+      if (state === 'active') st.mrr += r.n * (r.plan === 'anual' ? PLANS.anual.price / 12 : PLANS.mensal.price);
+    }
+    return json({
+      days, from,
+      site: Object.fromEntries(site.results.map((x) => [x.type, x.n])),
+      siteDaily: siteDay.results,
+      pages: Object.fromEntries(ev.results.map((x) => [x.type, x.n])),
+      pagesDaily: evDay.results,
+      bookingsDaily: bkDay.results,
+      tenants: st,
+      bookingsTotal: bkTotal.results[0]?.n || 0,
+      recent: recent.results.map((t) => ({ ...t, state: tenantState(t), url: publicUrl(env, url, t.slug) })),
+      top: top.results.map((t) => ({ ...t, url: publicUrl(env, url, t.slug) })),
+    });
+  }
   if (p === '/api/admin/tenants' && m === 'GET') {
     const from = brDay(new Date(Date.now() - 29 * 86400000));
     const r = await env.DB.prepare(`SELECT t.*,
@@ -324,7 +383,7 @@ async function adminApi(request, env, url, secure) {
     }
     await env.DB.prepare('UPDATE tenants SET status = ?, plan = ?, paid_until = ?, trial_ends = ?, slug = ? WHERE id = ?').bind(status, plan, paid, trial, slug, t.id).run();
     if (d.new_password) {
-      if (String(d.new_password).length < 4) return err('Senha muito curta.');
+      if (passError(String(d.new_password))) return err(passError(String(d.new_password)));
       await env.DB.prepare('UPDATE tenants SET password_hash = ? WHERE id = ?').bind(await hashPassword(String(d.new_password)), t.id).run();
     }
     return json({ ok: true });
@@ -392,7 +451,7 @@ export default {
 
       const B = brand(env);
       if (p === '/') return html(landingPage({ brand: B, trialDays: TRIAL_DAYS, demo: '/s/' + (env.DEMO_SLUG || 'vitoriacarvalho') }));
-      if (p === '/cadastro') return html(signupPage({ brand: B, segments: SEGMENTS, trialDays: TRIAL_DAYS, root }));
+      if (p === '/cadastro') return html(signupPage({ brand: B, segments: SEGMENTS, trialDays: TRIAL_DAYS, root, templates: templateList() }));
       if (p === '/entrar') return html(loginPage({ brand: B }));
       if (p === '/painel' || p.startsWith('/painel/')) return html(appShell({ brand: B, kind: 'panel' }), 200, { 'Cache-Control': 'no-store' });
       if (p === '/admin') return html(appShell({ brand: B, kind: 'admin' }), 200, { 'Cache-Control': 'no-store' });

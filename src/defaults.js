@@ -14,6 +14,7 @@ export function defaultConfig({ businessName, ownerName, whatsapp, city = '' }) 
   const first = (ownerName || businessName).split(' ')[0];
   return {
     v: 1,
+    template: 'glamour',
     theme: { accent: '#D45AE8', accent2: '#E58BF2', bg: '#0F0A10', cream: '#F3E9C6' },
     brand: { name: businessName, tagline: '' },
     hero: {
@@ -42,6 +43,7 @@ const V = '/seed/vitoria/';
 export function vitoriaConfig() {
   return {
     v: 1,
+    template: 'glamour',
     theme: { accent: '#D45AE8', accent2: '#E58BF2', bg: '#0F0A10', cream: '#F3E9C6' },
     brand: { name: 'Vitoria Carvalho', tagline: 'Lash Designer' },
     hero: {

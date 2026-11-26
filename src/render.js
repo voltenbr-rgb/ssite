@@ -224,7 +224,7 @@ ${svc.length ? `<label>Serviço<select name="service">${svc.map((x) => `<option>
 </div>`;
 }
 
-export function renderPage(tenant, config, { preview = false, offline = false, embed = false } = {}) {
+function renderGlamour(tenant, config, { preview = false, offline = false, embed = false } = {}) {
   const c = config || {};
   const t = c.theme || {};
   const name = c.brand?.name || tenant.business_name;
@@ -284,4 +284,25 @@ ${body}
 <script src="/static/page.js" defer></script>
 </body>
 </html>`;
+}
+
+/* ---------------- Modelos de página ----------------
+   Cada modelo recebe a MESMA configuração (seções, fotos, serviços…) e desenha do seu jeito.
+   Para adicionar um modelo: crie a função render e registre aqui. */
+export const TEMPLATES = {
+  glamour: {
+    id: 'glamour',
+    name: 'Glamour',
+    desc: 'Escuro e elegante, com detalhes coloridos, carrosséis e animações suaves. Ótimo para beleza e estética.',
+    thumb: '/static/models/glamour.jpg',
+    tags: ['Beleza', 'Estética', 'Cílios', 'Unhas'],
+    render: renderGlamour,
+  },
+};
+
+export const templateList = () => Object.values(TEMPLATES).map(({ render, ...t }) => t);
+
+export function renderPage(tenant, config, opts = {}) {
+  const tpl = TEMPLATES[config?.template] || TEMPLATES.glamour;
+  return tpl.render(tenant, config, opts);
 }
