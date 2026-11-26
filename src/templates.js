@@ -184,5 +184,5 @@ export function appShell({ brand, kind }) {
   const isAdmin = kind === 'admin';
   const pwa = isAdmin ? '' : `<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icons/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="${e(brand)}"><meta name="apple-mobile-web-app-status-bar-style" content="black">`;
   return shell(`${isAdmin ? 'Admin' : 'Painel'} · ${brand}`, `<div id="app" data-brand="${e(brand)}"><p class="loading">Carregando…</p></div>`,
-    { headExtra: `${pwa}<link rel="stylesheet" href="/static/panel.css">`, scripts: `<script src="/static/${isAdmin ? 'admin' : 'panel'}.js" defer></script>` });
+    { headExtra: `${pwa}<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/static/panel.css">`, scripts: `<script src="/static/${isAdmin ? 'admin' : 'panel'}.js" defer></script>` });
 }

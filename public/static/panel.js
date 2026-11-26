@@ -52,6 +52,7 @@
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
     layout: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/>',
+    arrowUR: '<path d="M7 17L17 7M8 7h9v9"/>',
     download: '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/>',
     gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8c-2-4-6-4-6-1s6 1 6 1 6 2 6-1-4-3-6 1"/>',
   };
@@ -122,20 +123,34 @@
   const NAV = [['inicio', 'Início', IC.home], ['agendamentos', 'Agendamentos', IC.cal], ['pagina', 'Editar página', IC.edit], ['midia', 'Fotos e vídeos', IC.img], ['conta', 'Minha conta', IC.user]];
   let pendingCount = 0;
 
+  const brToday = () => new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 10);
+  const initialsOf = (n) => String(n || '?').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
   function layout(content) {
-    const initials = (S.me.owner_name || S.me.business_name || '?').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const today = brToday();
+    const todays = (S.bk || []).filter((b) => b.date === today && b.status !== 'cancelado').sort((a, b) => String(a.time).localeCompare(String(b.time)));
+    const [, mo, d] = today.split('-');
+    const agenda = h('div', { class: 'agenda' },
+      h('span', { class: 'agenda-t' }, 'Sua agenda'),
+      h('span', { class: 'agenda-d' }, icon(IC.cal, 14), `${Number(d)} ${MESES[Number(mo) - 1]}`),
+      todays.length
+        ? h('div', { class: 'agenda-line', role: 'list', 'aria-label': 'Atendimentos de hoje' }, todays.map((b) => h('a', { href: '#agendamentos', role: 'listitem', class: 'slot' + (b.status === 'concluido' ? ' done' : '') }, h('span', { class: 'av', 'aria-hidden': 'true' }, initialsOf(b.client_name)), `${b.time || '--:--'} · ${b.client_name.split(' ')[0]}`)))
+        : h('div', { class: 'agenda-line empty' }, 'Nenhum atendimento marcado para hoje'),
+      h('a', { class: 'agenda-go', href: '#agendamentos', 'aria-label': 'Ver todos os agendamentos' }, icon(IC.right, 18)));
+    const top = h('header', { class: 'ws-top' },
+      h('a', { href: '#inicio', class: 'ws-logo', 'aria-label': BRAND }, BRAND.slice(0, 1).toUpperCase()),
+      agenda,
+      h('div', { class: 'top-icons' },
+        installBtn('btn btn-lime btn-sm install-top'),
+        h('a', { href: '#agendamentos', class: 'circle', 'aria-label': pendingCount ? pendingCount + ' agendamentos novos' : 'Agendamentos', title: 'Agendamentos' }, icon(IC.bell, 19), pendingCount ? h('span', { class: 'dot' }) : null),
+        h('a', { href: '#conta', class: 'user', 'aria-label': 'Minha conta' }, h('span', { class: 'avatar', 'aria-hidden': 'true' }, initialsOf(S.me.owner_name || S.me.business_name)), h('span', { class: 'nm' }, (S.me.owner_name || '').split(' ')[0]))));
     const side = h('nav', { class: 'side', 'aria-label': 'Menu do painel' },
-      h('a', { href: '#inicio', class: 'logo-sq', 'aria-label': BRAND, title: BRAND }, BRAND.slice(0, 1).toUpperCase()),
-      NAV.map(([id, label, ic]) => h('a', { href: '#' + id, class: 'navi', 'aria-label': label, 'aria-current': S.page === id ? 'page' : null }, icon(ic, 22), h('span', { class: 'lbl', 'aria-hidden': 'true' }, label), id === 'agendamentos' && pendingCount ? h('span', { class: 'count', 'aria-label': pendingCount + ' novos' }, pendingCount) : null)),
+      NAV.map(([id, label, ic]) => h('a', { href: '#' + id, class: 'navi', 'aria-label': label, 'aria-current': S.page === id ? 'page' : null }, icon(ic, 20), h('span', { class: 'lbl', 'aria-hidden': 'true' }, label), id === 'agendamentos' && pendingCount ? h('span', { class: 'count', 'aria-label': pendingCount + ' novos' }, pendingCount) : null)),
       h('div', { class: 'side-foot' },
-        h('a', { href: S.me.url, target: '_blank', rel: 'noopener', class: 'navi', 'aria-label': 'Ver minha página' }, icon(IC.eye, 22), h('span', { class: 'lbl', 'aria-hidden': 'true' }, 'Ver minha página')),
-        h('button', { class: 'navi', 'aria-label': 'Sair', onclick: logout }, icon(IC.out, 22), h('span', { class: 'lbl', 'aria-hidden': 'true' }, 'Sair'))));
+        h('a', { href: S.me.url, target: '_blank', rel: 'noopener', class: 'navi', 'aria-label': 'Ver minha página' }, icon(IC.eye, 20), h('span', { class: 'lbl', 'aria-hidden': 'true' }, 'Ver minha página')),
+        h('button', { class: 'navi', 'aria-label': 'Sair', onclick: logout }, icon(IC.out, 20), h('span', { class: 'lbl', 'aria-hidden': 'true' }, 'Sair'))));
     const main = h('main', { class: 'main', id: 'main' });
-    S._user = h('div', { class: 'topright' },
-      installBtn('btn btn-sky btn-sm install-top'),
-      h('a', { href: S.me.url, target: '_blank', rel: 'noopener', class: 'circle', 'aria-label': 'Ver minha página', title: 'Ver minha página' }, icon(IC.eye, 19)),
-      h('a', { href: '#agendamentos', class: 'circle', 'aria-label': pendingCount ? pendingCount + ' agendamentos novos' : 'Agendamentos', title: 'Agendamentos' }, icon(IC.bell, 19), pendingCount ? h('span', { class: 'dot' }) : null),
-      h('a', { href: '#conta', class: 'user' }, h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials), h('span', { class: 'nm' }, (S.me.owner_name || '').split(' ')[0]), icon(IC.chev, 16)));
     const st = S.me.state;
     if (st === 'trial') {
       const left = Math.max(0, Math.ceil((new Date(S.me.trial_ends) - Date.now()) / 86400000));
@@ -144,105 +159,121 @@
       main.append(h('div', { class: 'banner' }, h('span', {}, st === 'expired' ? 'Seu teste grátis terminou e sua página está fora do ar. Ative seu plano para voltar.' : 'Sua conta está bloqueada e a página está fora do ar. Fale com o suporte.'), h('a', { href: '#conta', class: 'btn btn-line btn-sm' }, 'Ativar plano')));
     }
     main.append(content);
-    $app.replaceChildren(h('div', { class: 'app' }, side, main));
+    $app.replaceChildren(h('div', { class: 'app' }, top, side, main));
   }
 
   async function logout() { await api('/api/logout', { method: 'POST' }).catch(() => {}); location.href = '/entrar'; }
 
   function topline(title, sub, ...right) {
-    return h('div', { class: 'topline' }, h('div', {}, h('h1', {}, title), sub ? h('p', { class: 'sub' }, sub) : null), h('div', { class: 'topright' }, ...right, S._user));
+    return h('div', { class: 'topline' }, h('div', {}, h('h1', {}, title), sub ? h('p', { class: 'sub' }, sub) : null), h('div', { class: 'topright' }, ...right));
   }
 
   /* ---------- Início (métricas) ---------- */
   async function pageInicio() {
     const box = h('div');
     layout(box);
-    const firstName = (S.me.owner_name || '').split(' ')[0];
-    box.append(topline('Visão geral', `Olá, ${firstName}! Veja como sua página está indo.`));
-    const holder = h('div', {}, h('p', { class: 'muted' }, 'Carregando números…'));
+    const holder = h('p', { class: 'muted' }, 'Carregando…');
     box.append(holder);
     let st, bks;
-    try { [st, bks] = await Promise.all([api('/api/stats?days=' + S.statDays), api('/api/bookings')]); } catch (e) { holder.replaceChildren(h('p', { class: 'muted' }, e.message)); return; }
+    try { [st, bks] = await Promise.all([api('/api/stats?days=' + S.statDays), api('/api/bookings')]); } catch (e) { holder.textContent = e.message; return; }
+    const prevLen = (S.bk || []).length;
+    S.bk = bks.bookings || []; pendingCount = (bks.counts || {}).novo || 0;
+    if (prevLen !== S.bk.length) { layout(box); }
     const T = st.totals || {};
-    const views = T.view || 0, wa = (T.whatsapp || 0) + (T.booking_open || 0), bk = T.booking || 0, svc = T.service || 0;
-    const pct = (n) => (views ? Math.round((n / views) * 100) + '% das visitas' : 'sem visitas ainda');
+    const views = T.view || 0, clicks = (T.whatsapp || 0) + (T.booking_open || 0), bk = T.booking || 0, svc = T.service || 0;
+    const today = brToday();
+    const todayOf = (type) => (st.daily || []).filter((r) => r.day === today && r.type === type).reduce((a, r) => a + r.n, 0);
+    const stat = (n, label, sup) => h('div', { class: 'stat' }, h('b', {}, n.toLocaleString('pt-BR')), h('span', {}, label), sup ? h('sup', { class: 'up', title: 'hoje' }, '+' + sup) : null);
+    const head = h('div', { class: 'ws-head' },
+      h('h1', {}, 'Painel', h('span', { class: 'o', 'aria-hidden': 'true' })),
+      h('a', { class: 'btn btn-main btn-sm', href: S.me.url, target: '_blank', rel: 'noopener' }, icon(IC.eye, 16), 'Ver página'),
+      h('div', { class: 'stats', 'aria-label': `Últimos ${st.days} dias` }, stat(views, 'visitas', todayOf('view')), stat(clicks, 'cliques', todayOf('whatsapp') + todayOf('booking_open')), stat(bk, 'agendamentos', todayOf('booking'))));
 
-    // gráfico de visitas (linha)
+    // ---- pedidos (cartões com canto recortado) ----
+    S.homeFilter = S.homeFilter || 'todos';
+    const FIL = { todos: ['Todos', () => true], novo: ['Novos', (b) => b.status === 'novo'], confirmado: ['Confirmados', (b) => b.status === 'confirmado'], hoje: ['Hoje', (b) => b.date === today] };
+    const list = S.bk.filter(FIL[S.homeFilter][1]).slice(0, 12);
+    const STL = { novo: 'Novo', confirmado: 'Confirmado', concluido: 'Concluído', cancelado: 'Cancelado' };
+    const msgFor = (b) => `Olá, ${b.client_name.split(' ')[0]}! Aqui é ${S.me.owner_name.split(' ')[0]}, do ${S.me.business_name}. Confirmando seu horário${b.service ? ' de ' + b.service : ''}${b.date ? ' em ' + fmtDate(b.date) : ''}${b.time ? ' às ' + b.time : ''}.`;
+    const lead = (b) => h('div', { class: 'lc notch' },
+      h('div', { class: 'nb' },
+        h('span', { class: 'av', 'aria-hidden': 'true' }, initialsOf(b.client_name)),
+        h('h3', {}, b.client_name), h('p', { class: 'role', style: 'margin:0' }, b.service || 'Serviço a combinar'),
+        h('div', { class: 'lead-meta' },
+          h('div', {}, h('small', {}, 'Quando'), h('span', { class: 'tagp' }, b.date ? fmtDate(b.date).slice(0, 5) : 'sem data'), b.time ? h('span', { class: 'tagp' }, b.time) : null),
+          h('div', { style: 'text-align:right' }, h('small', {}, STL[b.status]), h('span', { class: 'dots ' + b.status, 'aria-label': STL[b.status] }, h('i'), h('i'), h('i'), h('i'), h('i'))))),
+      h('a', { class: 'corner', href: `https://wa.me/${waNum(b.client_phone)}?text=${encodeURIComponent(msgFor(b))}`, target: '_blank', rel: 'noopener', 'aria-label': 'Chamar ' + b.client_name + ' no WhatsApp' }, icon(IC.arrowUR, 16)));
+    const chips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Filtrar pedidos' }, Object.entries(FIL).map(([k, [l]]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(S.homeFilter === k), onclick: () => { S.homeFilter = k; pageInicio(); } }, l)));
+    const leads = h('section', {},
+      h('div', { class: 'sec-t' }, h('h2', {}, 'Pedidos de agendamento'), h('a', { href: '#agendamentos', class: 'cnt' }, `${S.bk.length} pedido${S.bk.length === 1 ? '' : 's'}`), chips),
+      list.length ? h('div', { class: 'hscroll' }, list.map(lead)) : h('div', { class: 'empty' }, icon(IC.cal, 34), h('p', { style: 'margin:0' }, S.bk.length ? 'Nada neste filtro.' : 'Os pedidos feitos pela sua página aparecem aqui.')));
+
+    // ---- destaques ----
+    const now = new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+    const next = S.bk.filter((b) => ['novo', 'confirmado'].includes(b.status) && b.date && `${b.date} ${b.time || '23:59'}` >= now).sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))[0];
+    const nextCard = next
+      ? h('div', { class: 'task lime notch' }, h('div', { class: 'nb' },
+          h('div', { class: 'task-who' }, h('span', { class: 'av dark', 'aria-hidden': 'true' }, initialsOf(next.client_name)), h('div', {}, h('small', {}, 'Próximo atendimento'), h('b', {}, next.client_name))),
+          h('h3', {}, h('span', { class: 'ic' }, icon(IC.cal, 20)), next.service || 'Atendimento'),
+          h('p', { class: 'when', style: 'margin:0' }, `${fmtDate(next.date)}${next.time ? ' às ' + next.time : ''}`),
+          h('div', { class: 'task-foot' }, h('span', { class: 'status-pill' }, h('span', { class: 'av', style: 'width:24px;height:24px;font-size:10px;background:#111;color:var(--lime)' }, '✓'), STL[next.status]),
+            h('a', { class: 'round-dark', href: `https://wa.me/${waNum(next.client_phone)}?text=${encodeURIComponent(msgFor(next))}`, target: '_blank', rel: 'noopener', 'aria-label': 'WhatsApp de ' + next.client_name }, icon(IC.chat, 17)))),
+          h('a', { class: 'corner', href: '#agendamentos', 'aria-label': 'Ver agendamentos' }, icon(IC.arrowUR, 16)))
+      : h('div', { class: 'task lime notch' }, h('div', { class: 'nb' },
+          h('div', { class: 'task-who' }, h('span', { class: 'av dark', 'aria-hidden': 'true' }, initialsOf(S.me.owner_name)), h('div', {}, h('b', {}, 'Próximo atendimento'), h('small', {}, 'Nenhum marcado ainda'))),
+          h('h3', {}, h('span', { class: 'ic' }, icon(IC.copy, 20)), 'Divulgue seu link'),
+          h('p', { class: 'when', style: 'margin:0' }, 'Coloque na bio do Instagram e mande no WhatsApp.'),
+          h('div', { class: 'task-foot' }, h('span', { class: 'status-pill' }, 'Agenda livre'), h('button', { class: 'round-dark', type: 'button', 'aria-label': 'Copiar link', onclick: () => navigator.clipboard.writeText(S.me.url).then(() => toast('Link copiado!')) }, icon(IC.copy, 17)))),
+          h('a', { class: 'corner', href: S.me.url, target: '_blank', rel: 'noopener', 'aria-label': 'Abrir minha página' }, icon(IC.arrowUR, 16)));
+
+    // gráfico de visitas
     const days = [];
     for (let i = st.days - 1; i >= 0; i--) days.push(new Date(Date.now() - 4 * 3600e3 - i * 86400e3).toISOString().slice(0, 10));
-    const byDay = {}; (st.daily || []).forEach((r) => { byDay[r.day] = byDay[r.day] || {}; byDay[r.day][r.type] = r.n; });
-    const vals = days.map((d) => (byDay[d] || {}).view || 0);
-    const max = Math.max(1, ...vals);
-    const W = 600, H = 150, n = vals.length;
-    const pts = vals.map((v, i) => [n === 1 ? W / 2 : (i / (n - 1)) * W, H - 8 - (v / max) * (H - 28)]);
+    const byDay = {}; (st.daily || []).forEach((r) => { if (r.type === 'view') byDay[r.day] = r.n; });
+    const vals = days.map((d) => byDay[d] || 0), max = Math.max(1, ...vals), W = 600, H = 110, n = vals.length;
+    const pts = vals.map((v, i) => [n === 1 ? W / 2 : (i / (n - 1)) * W, H - 6 - (v / max) * (H - 20)]);
     const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
-    const svgNS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(svgNS, 'svg');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'chart-svg');
-    svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', `Visitas por dia: ${views} no total em ${st.days} dias`);
-    svg.innerHTML = `<defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#7DB6F2" stop-opacity=".45"/><stop offset="1" stop-color="#7DB6F2" stop-opacity="0"/></linearGradient></defs>
-      <path d="${line} L ${W} ${H} L 0 ${H} Z" fill="url(#ga)"/>
-      <path d="${line}" fill="none" stroke="#5A9BE0" stroke-width="2.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
-      <line id="vl" x1="0" x2="0" y1="0" y2="${H}" stroke="#5A9BE0" stroke-dasharray="3 4" vector-effect="non-scaling-stroke" opacity="0"/>
-      <circle id="vd" r="5" fill="#5A9BE0" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke" opacity="0"/>`;
+    svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', `Visitas por dia: ${views} em ${st.days} dias`);
+    svg.innerHTML = `<path d="${line} L ${W} ${H} L 0 ${H} Z" fill="#CDF56A" opacity=".55"/><path d="${line}" fill="none" stroke="#111" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
     const tip = h('div', { class: 'tip' });
-    const chartWrap = h('div', { style: 'position:relative' }, svg, tip);
-    const showAt = (i) => {
-      const [x, y] = pts[i]; const r = svg.getBoundingClientRect();
-      const px = (x / W) * r.width, py = (y / H) * r.height;
-      svg.querySelector('#vl').setAttribute('x1', x); svg.querySelector('#vl').setAttribute('x2', x); svg.querySelector('#vl').setAttribute('opacity', 1);
-      svg.querySelector('#vd').setAttribute('cx', x); svg.querySelector('#vd').setAttribute('cy', y); svg.querySelector('#vd').setAttribute('opacity', 1);
-      tip.textContent = `${fmtDate(days[i]).slice(0, 5)} · ${vals[i]} visita${vals[i] === 1 ? '' : 's'}`;
-      tip.style.left = px + 'px'; tip.style.top = (py + 6) + 'px'; tip.style.opacity = 1;
-    };
-    svg.addEventListener('pointermove', (e) => { const r = svg.getBoundingClientRect(); showAt(Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left) / r.width) * (n - 1))))); });
-    svg.addEventListener('pointerleave', () => { tip.style.opacity = 0; svg.querySelector('#vl').setAttribute('opacity', 0); svg.querySelector('#vd').setAttribute('opacity', 0); });
+    svg.addEventListener('pointermove', (e) => { const r = svg.getBoundingClientRect(); const i = Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left) / r.width) * (n - 1)))); tip.textContent = `${fmtDate(days[i]).slice(0, 5)} · ${vals[i]} visita${vals[i] === 1 ? '' : 's'}`; tip.style.left = (pts[i][0] / W) * r.width + 'px'; tip.style.top = (pts[i][1] / H) * r.height + 'px'; tip.style.opacity = 1; });
+    svg.addEventListener('pointerleave', () => { tip.style.opacity = 0; });
     const periods = h('div', { class: 'periods', role: 'group', 'aria-label': 'Período' }, [[7, '7D'], [30, '30D'], [90, '90D']].map(([d, l]) => h('button', { type: 'button', 'aria-pressed': String(S.statDays === d), onclick: () => { S.statDays = d; pageInicio(); } }, l)));
-    const chartCard = h('div', { class: 'chart-card' },
-      h('div', { class: 'big' }, views.toLocaleString('pt-BR')), h('div', { class: 'big-sub' }, `Visitas na página · últimos ${st.days} dias`),
-      chartWrap, periods);
-
-    // cartões pastel
-    const tile = (cls, value, label, ic, foot) => h('div', { class: 'tile ' + cls }, h('div', { class: 'tv' }, value.toLocaleString('pt-BR')), h('div', { class: 'tl' }, label), h('div', { class: 'tf' }, h('span', { class: 'ti' }, icon(ic, 22)), h('span', { class: 'tp' }, foot)));
-    const tiles = h('div', { class: 'tiles' },
-      tile('t-lav', wa, 'Cliques para agendar', IC.chat, pct(wa)),
-      tile('t-mint', bk, 'Agendamentos', IC.cal, pct(bk)),
-      tile('t-cream', svc, 'Cliques em serviços', IC.click, pct(svc)));
-
-    // tabela de agendamentos recentes
-    const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-    const STL = { novo: 'Novo', confirmado: 'Confirmado', concluido: 'Concluído', cancelado: 'Cancelado' };
-    const recent = (bks.bookings || []).slice(0, 5);
-    const table = recent.length ? h('table', { class: 'tbl' },
-      h('thead', {}, h('tr', {}, ['Cliente', 'Serviço', 'Data', 'Status', ''].map((c) => h('th', { scope: 'col' }, c)))),
-      h('tbody', {}, recent.map((b) => {
-        const [, mo, d] = (b.date || '').split('-');
-        return h('tr', {},
-          h('td', {}, h('div', { class: 'who' }, h('span', { class: 'sq', 'aria-hidden': 'true' }, (b.client_name || '?')[0].toUpperCase()), h('div', {}, h('b', {}, b.client_name), h('small', {}, phoneFmt(b.client_phone))))),
-          h('td', {}, b.service || '—'),
-          h('td', {}, d ? `${d} ${MES[Number(mo) - 1]}${b.time ? ' · ' + b.time : ''}` : '—'),
-          h('td', {}, h('span', { class: 'st ' + b.status }, STL[b.status])),
-          h('td', {}, h('a', { href: `https://wa.me/${waNum(b.client_phone)}`, target: '_blank', rel: 'noopener', class: 'circle', style: 'width:38px;height:38px', 'aria-label': 'WhatsApp de ' + b.client_name }, icon(IC.chat, 17))));
-      }))) : h('div', { class: 'empty' }, icon(IC.cal, 36), h('p', {}, 'Os agendamentos feitos pela sua página aparecem aqui.'));
-
-    // cartão escuro: compartilhar link
-    const promo = h('div', { class: 'promo' },
-      h('h3', {}, 'Leve ', h('span', { class: 'pill-o' }, 'mais'), ' clientes para a sua página'),
-      h('p', {}, 'Coloque o link na bio do Instagram e mande no WhatsApp. Cada visita vira número aqui.'),
-      h('div', { class: 'linkbox' }, h('a', { href: S.me.url, target: '_blank', rel: 'noopener' }, S.me.url.replace(/^https?:\/\//, ''))),
-      h('div', { class: 'row' }, h('button', { class: 'btn btn-sky', type: 'button', onclick: () => navigator.clipboard.writeText(S.me.url).then(() => toast('Link copiado! Cole na bio do Instagram.')) }, icon(IC.copy, 16), 'Copiar link')));
-
+    const chartCard = h('div', { class: 'task notch' }, h('div', { class: 'nb' },
+      h('div', { class: 'task-who' }, h('span', { class: 'ic', style: 'width:34px;height:34px;border-radius:50%;background:#F2F2F2;display:flex;align-items:center;justify-content:center' }, icon(IC.eye, 17)), h('div', {}, h('b', {}, 'Visitas'), h('small', {}, `Últimos ${st.days} dias`))),
+      h('div', { class: 'big' }, views.toLocaleString('pt-BR')),
+      h('div', { style: 'position:relative;margin-top:auto' }, svg, tip),
+      periods),
+      h('a', { class: 'corner', href: S.me.url, target: '_blank', rel: 'noopener', 'aria-label': 'Abrir minha página' }, icon(IC.arrowUR, 16)));
     const tops = st.top || []; const tmax = Math.max(1, ...tops.map((t) => t.n));
-    const topCard = h('div', { class: 'card' }, h('h2', {}, 'Serviços mais procurados'),
-      tops.length ? h('ul', { class: 'top-list' }, tops.map((t) => h('li', {}, h('div', { class: 'tlr' }, h('span', {}, t.label), h('b', {}, t.n)), h('div', { class: 'meter' }, h('span', { style: `width:${(t.n / tmax) * 100}%` }))))) : h('p', { class: 'muted', style: 'margin:0' }, 'Ainda sem cliques em serviços neste período.'));
+    const topCard = h('div', { class: 'task notch' }, h('div', { class: 'nb' },
+      h('div', { class: 'task-who' }, h('span', { class: 'ic', style: 'width:34px;height:34px;border-radius:50%;background:#F2F2F2;display:flex;align-items:center;justify-content:center' }, icon(IC.click, 17)), h('div', {}, h('b', {}, 'Mais procurados'), h('small', {}, `${svc} cliques em serviços`))),
+      tops.length ? h('ul', { class: 'top-list' }, tops.slice(0, 4).map((t) => h('li', {}, h('div', { class: 'tlr' }, h('span', {}, t.label), h('b', {}, t.n)), h('div', { class: 'meter' }, h('span', { style: `width:${(t.n / tmax) * 100}%` }))))) : h('p', { class: 'muted', style: 'margin:0' }, 'Ainda sem cliques em serviços neste período.')),
+      h('a', { class: 'corner', href: '#pagina', 'aria-label': 'Editar serviços' }, icon(IC.arrowUR, 16)));
+    const highlights = h('section', {}, h('div', { class: 'sec-t' }, h('h2', {}, 'Sua página hoje')), h('div', { class: 'tasks' }, nextCard, chartCard, topCard));
 
-    holder.replaceChildren(
-      st.pending ? h('div', { class: 'banner info' }, h('span', {}, `Você tem ${st.pending} agendamento${st.pending > 1 ? 's' : ''} novo${st.pending > 1 ? 's' : ''} para confirmar.`), h('a', { href: '#agendamentos', class: 'btn btn-main btn-sm' }, 'Ver agora')) : '',
-      h('div', { class: 'ov' },
-        h('div', { class: 'ov-l' }, h('div', { class: 'sec-t' }, h('h2', {}, 'Sua página')), chartCard),
-        h('div', { class: 'ov-r' }, h('div', { class: 'sec-t' }, h('h2', {}, 'Seus números')), tiles),
-        h('div', { class: 'ov-l' }, h('div', { class: 'sec-t' }, h('h2', {}, 'Agendamentos recentes'), h('a', { href: '#agendamentos', class: 'btn btn-line btn-sm' }, 'Ver todos')), table),
-        h('div', { class: 'ov-r' }, promo, topCard)));
+    // ---- resumo escuro ----
+    const conv = views ? ((bk / views) * 100).toFixed(1).replace('.', ',') + '%' : '—';
+    const summary = h('aside', { class: 'summary', 'aria-label': 'Resumo' },
+      h('h2', {}, 'Resumo', h('a', { href: S.me.url, target: '_blank', rel: 'noopener', class: 'circle', style: 'background:#222;color:#fff;width:40px;height:40px', 'aria-label': 'Abrir minha página' }, icon(IC.arrowUR, 16))),
+      h('div', { class: 'sum-box' }, h('h3', {}, 'Seu link'),
+        h('div', { class: 'linkbox' }, h('a', { href: S.me.url, target: '_blank', rel: 'noopener' }, S.me.url.replace(/^https?:\/\//, '')),
+          h('button', { class: 'btn btn-lime btn-sm', type: 'button', onclick: () => navigator.clipboard.writeText(S.me.url).then(() => toast('Link copiado! Cole na bio do Instagram.')) }, 'Copiar'))),
+      h('div', { class: 'sum-box' }, h('h3', {}, `Últimos ${st.days} dias`),
+        h('ul', { class: 'timeline' },
+          h('li', {}, 'Visitas', h('b', {}, views.toLocaleString('pt-BR'))),
+          h('li', {}, 'Cliques para agendar', h('b', {}, clicks.toLocaleString('pt-BR'))),
+          h('li', {}, 'Cliques em serviços', h('b', {}, svc.toLocaleString('pt-BR'))),
+          h('li', {}, 'Agendamentos', h('b', {}, bk.toLocaleString('pt-BR'))),
+          h('li', {}, 'Conversão', h('b', {}, conv)))),
+      isStandalone() ? null : h('div', { class: 'sum-box' }, h('h3', {}, 'App do painel'), h('p', { style: 'margin:0;color:#aaa;font-size:14px' }, 'Abra com um toque, no celular ou no computador.'), installBtn('btn btn-lime')));
+
+    holder.replaceWith(
+      head,
+      st.pending ? h('div', { class: 'banner info' }, h('span', {}, `Você tem ${st.pending} pedido${st.pending > 1 ? 's' : ''} novo${st.pending > 1 ? 's' : ''} para confirmar.`), h('a', { href: '#agendamentos', class: 'btn btn-main btn-sm' }, 'Ver agora')) : '',
+      h('div', { class: 'ws-grid' }, h('div', { class: 'ws-col' }, leads, highlights), summary));
   }
 
   /* ---------- Agendamentos ---------- */
@@ -257,6 +288,7 @@
     const c = data.counts || {};
     const all = Object.values(c).reduce((a, b) => a + b, 0);
     pendingCount = c.novo || 0;
+    if (!S.bkFilter) S.bk = data.bookings;
     [['', 'Todos', all], ['novo', 'Novos', c.novo || 0], ['confirmado', 'Confirmados', c.confirmado || 0], ['concluido', 'Concluídos', c.concluido || 0], ['cancelado', 'Cancelados', c.cancelado || 0]]
       .forEach(([k, l, n]) => chipsEl.append(h('button', { type: 'button', class: 'chip', 'aria-pressed': String(S.bkFilter === k), onclick: () => { S.bkFilter = k; pageAgendamentos(); } }, `${l} (${n})`)));
     if (!data.bookings.length) {
@@ -704,7 +736,7 @@
   window.addEventListener('beforeunload', (e) => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
   (async () => {
     try { await loadMe(); } catch (_) { return; }
-    try { const b = await api('/api/bookings?status=novo'); pendingCount = (b.counts || {}).novo || 0; } catch (_) {}
+    try { const b = await api('/api/bookings'); S.bk = b.bookings || []; pendingCount = (b.counts || {}).novo || 0; } catch (_) {}
     if (new URLSearchParams(location.search).get('bemvinda')) { history.replaceState(null, '', '/painel#pagina'); setTimeout(() => toast('Conta criada! Comece colocando sua foto e seus serviços.'), 400); }
     route();
   })();
