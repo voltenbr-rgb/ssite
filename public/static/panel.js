@@ -351,7 +351,7 @@
         h('a', { class: 'corner', href: x.url, target: '_blank', rel: 'noopener', 'aria-label': 'Abrir ' + x.business_name }, icon(IC.arrowUR, 16)));
       pagesSec = h('section', {},
         h('div', { class: 'sec-t' }, h('h2', {}, 'Suas páginas'), h('span', { class: 'cnt' }, `${P.pages.length} de ${P.max}`), h('span', { class: 'muted small' }, `Todas: ${tot.v} visitas · ${tot.c} cliques · ${tot.b} agendamentos`)),
-        h('div', { class: 'hscroll' }, P.pages.map(card), h('button', { type: 'button', class: 'pg-new', onclick: addPageDialog }, icon(IC.plus, 22), P.pages.length >= P.max ? 'Liberar mais páginas' : 'Adicionar página')));
+        h('div', { class: 'hscroll pg-list' }, P.pages.map(card), h('button', { type: 'button', class: 'pg-new', onclick: addPageDialog }, icon(IC.plus, 22), P.pages.length >= P.max ? 'Liberar mais páginas' : 'Adicionar página')));
     }
     holder.replaceWith(
       head,
