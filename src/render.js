@@ -1,5 +1,6 @@
 // Gera o HTML da página pública de um assinante a partir da configuração (JSON).
 import { makeTatico } from './tpl-tatico.js';
+import { makeAtelie } from './tpl-atelie.js';
 
 export const e = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const safeUrl = (u) => {
@@ -302,6 +303,7 @@ ${body}
    Cada modelo recebe a MESMA configuração (seções, fotos, serviços…) e desenha do seu jeito.
    Para adicionar um modelo: crie a função render e registre aqui. */
 const tatico = makeTatico({ e, safeUrl, color, digits, bookingModal, loop, bookingInfo });
+const atelie = makeAtelie({ e, safeUrl, color, digits, bookingModal, bookingInfo });
 
 export const TEMPLATES = {
   glamour: {
@@ -321,6 +323,15 @@ export const TEMPLATES = {
     tags: ['Airsoft', 'Barbearia', 'Tatuagem', 'Loja'],
     render: tatico.render,
     theme: { accent: '#FF6A00', accent2: '#FF8F33', bg: '#070707', cream: '#F3F3F3' },
+  },
+  atelie: {
+    id: 'atelie',
+    name: 'Ateliê',
+    desc: 'Escuro com dourado, letras elegantes, foto em arco e galeria por categorias. Ótimo para cabelo, sobrancelha, maquiagem e estética.',
+    thumb: '/static/models/atelie.jpg',
+    tags: ['Cabelo', 'Sobrancelha', 'Maquiagem', 'Estética'],
+    render: atelie.render,
+    theme: { accent: '#d9b98a', accent2: '#c4122f', bg: '#0b0a0a', cream: '#f4efe9' },
   },
 };
 

@@ -537,47 +537,63 @@
       { type: 'bool', path: 'brand.topbar', label: 'Mostrar barra com a logo no topo (modelo Tático)' },
       T('brand.title', 'Título na aba do navegador e no Google'), T('brand.description', 'Descrição para Google e WhatsApp', { area: true }),
       { type: 'image', path: 'brand.ogImage', label: 'Imagem quando o link é compartilhado' }, { type: 'image', path: 'brand.favicon', label: 'Ícone da aba (favicon)' }] },
-    { key: 'cta', title: 'Botão principal', ic: IC.click, fields: [T('cta.text', 'Texto do botão', { hint: 'Ex.: Entrar no grupo gratuito' }), T('cta.url', 'Link do botão', { hint: 'Deixe vazio para o botão abrir o agendamento. Com link (ex.: grupo do WhatsApp), todos os botões levam para ele.' })] },
+    { not: ['atelie'], key: 'cta', title: 'Botão principal', ic: IC.click, fields: [T('cta.text', 'Texto do botão', { hint: 'Ex.: Entrar no grupo gratuito' }), T('cta.url', 'Link do botão', { hint: 'Deixe vazio para o botão abrir o agendamento. Com link (ex.: grupo do WhatsApp), todos os botões levam para ele.' })] },
     { key: 'hero', title: 'Capa', ic: IC.home, fields: [
       { type: 'image', path: 'hero.photo', label: 'Sua foto principal (ou logo)' },
-      { type: 'image', path: 'hero.bg', label: 'Imagem de fundo da capa (modelo Tático)' },
+      { type: 'image', path: 'hero.bg', label: 'Imagem de fundo da capa', tpl: ['tatico'] },
       T('hero.eyebrow', 'Cidade / chamada acima do título'), T('hero.title', 'Título'), T('hero.highlight', 'Palavra em destaque', { hint: 'Aparece colorida e em itálico' }),
       T('hero.after', 'Texto depois do destaque', { hint: 'Opcional. Ex.: selecionados.' }),
-      T('hero.subtitle', 'Frase de apresentação', { area: true }), T('hero.address', 'Endereço curto'), T('hero.badge', 'Selo sobre a foto'),
+      { type: 'strings', path: 'hero.rotate', label: 'Palavras que se alternam no título', placeholder: 'Ex.: cachos', tpl: ['atelie'] },
+      T('hero.subtitle', 'Frase de apresentação', { area: true }), { ...T('hero.address', 'Endereço curto'), not: ['atelie'] }, { ...T('hero.badge', 'Selo sobre a foto'), not: ['atelie'] },
+      { ...T('hero.ctaText', 'Texto do botão principal'), tpl: ['atelie'] }, { ...T('hero.ctaMsg', 'Mensagem do WhatsApp desse botão'), tpl: ['atelie'] },
+      { ...T('hero.secondText', 'Texto do segundo botão', { hint: 'Ex.: Ver trabalhos ↓' }), tpl: ['atelie'] },
+      { ...T('hero.headerCta', 'Botão do topo'), tpl: ['atelie'] }, { ...T('hero.headerMsg', 'Mensagem do WhatsApp do botão do topo'), tpl: ['atelie'] },
+      { type: 'image', path: 'hero.side1', label: 'Foto inclinada da esquerda', tpl: ['atelie'] }, { type: 'image', path: 'hero.side2', label: 'Foto inclinada da direita', tpl: ['atelie'] },
+      { type: 'images', path: 'hero.faces', label: 'Fotinhas redondas (até 5)', tpl: ['atelie'] },
+      { ...T('hero.proofTitle', 'Texto ao lado das fotinhas (negrito)'), tpl: ['atelie'] }, { ...T('hero.proofText', 'Texto ao lado das fotinhas'), tpl: ['atelie'] },
+      { ...T('hero.seal', 'Texto do selo girando', { hint: 'Ex.: AGENDE SEU HORÁRIO • CHAME NO ZAP • ' }), tpl: ['atelie'] },
+      { type: 'list', path: 'hero.badges', label: 'Etiquetas sobre a foto (até 2)', tpl: ['atelie'], itemLabel: (x, i) => x.t || 'Etiqueta ' + (i + 1), add: () => ({ icon: '✨', t: '', d: '' }), fields: [T('icon', 'Emoji'), T('t', 'Título'), T('d', 'Texto pequeno')] },
       { type: 'strings', path: 'hero.trust', label: 'Selos abaixo do botão', placeholder: 'Ex.: 100% gratuito' },
-      { type: 'image', path: 'hero.bgMobile', label: 'Fundo da capa no celular (modelo Tático, opcional)' }] },
+      { type: 'image', path: 'hero.bgMobile', label: 'Fundo da capa no celular (opcional)', tpl: ['tatico'] }] },
     { key: 'marquee', title: 'Faixa animada', ic: IC.wave, toggle: true, fields: [{ type: 'strings', path: 'marquee.words', label: 'Palavras que passam na faixa', placeholder: 'Ex.: Autoestima' }] },
-    { key: 'blocks', title: 'Blocos de conteúdo', ic: IC.layout, fields: [
+    { not: ['atelie'], key: 'blocks', title: 'Blocos de conteúdo', ic: IC.layout, fields: [
       { type: 'list', path: 'blocks', label: 'Blocos (benefícios, categorias, passos, regras…)', itemLabel: (x, i) => (x.eyebrow || x.title || 'Bloco ' + (i + 1)), add: () => ({ kind: 'cards', eyebrow: '', title: '', highlight: '', sub: '', alt: false, center: false, items: [] }), fields: [
         { type: 'select', path: 'kind', label: 'Tipo', options: [['cards', 'Cartões com ícone'], ['steps', 'Passos numerados'], ['checks', 'Lista com checks']] },
         T('eyebrow', 'Chamada (ex.: BENEFÍCIOS)'), T('title', 'Título'), T('highlight', 'Destaque do título'), T('sub', 'Texto abaixo do título', { area: true }),
         { type: 'bool', path: 'alt', label: 'Fundo alternado', def: false }, { type: 'bool', path: 'center', label: 'Título centralizado', def: false },
         { type: 'list', path: 'items', label: 'Itens', itemLabel: (x, i) => x.t || 'Item ' + (i + 1), add: () => ({ icon: 'alvo', t: '', d: '', note: '' }), fields: [
           { type: 'select', path: 'icon', label: 'Ícone (cartões)', options: ICONS }, T('t', 'Título'), T('d', 'Texto', { area: true, hint: 'Use **assim** para negrito.' }), T('note', 'Observação (opcional)')] }] }] },
-    { key: 'faq', title: 'Perguntas frequentes', ic: IC.info, toggle: true, fields: [
+    { not: ['atelie'], key: 'faq', title: 'Perguntas frequentes', ic: IC.info, toggle: true, fields: [
       T('faq.eyebrow', 'Chamada'), T('faq.title', 'Título'), T('faq.highlight', 'Destaque'),
       { type: 'list', path: 'faq.items', label: 'Perguntas', itemLabel: (x, i) => x.q || 'Pergunta ' + (i + 1), add: () => ({ q: '', a: '' }), fields: [T('q', 'Pergunta'), T('a', 'Resposta', { area: true })] }] },
     { key: 'gallery', title: 'Galeria de fotos', ic: IC.img, toggle: true, fields: [
-      { type: 'images', path: 'gallery.photos', label: 'Carrossel principal (fotos altas)' },
-      { type: 'images', path: 'gallery.round', label: 'Carrossel de fotos redondas' },
-      T('gallery.eyebrow', 'Chamada'), T('gallery.title', 'Título'), T('gallery.highlight', 'Destaque'), T('gallery.note', 'Texto ao lado')] },
-    { key: 'videos', title: 'Vídeos', ic: IC.video, toggle: true, fields: [
+      { type: 'images', path: 'gallery.photos', label: 'Carrossel principal (fotos altas)', not: ['atelie'] },
+      { type: 'images', path: 'gallery.round', label: 'Carrossel de fotos redondas', not: ['atelie'] },
+      { type: 'list', path: 'gallery.groups', label: 'Categorias (abas) da galeria', tpl: ['atelie'], itemLabel: (x, i) => (x.label || 'Categoria ' + (i + 1)) + ' · ' + ((x.photos || []).length) + ' fotos', add: () => ({ label: '', photos: [] }), fields: [T('label', 'Nome da categoria', { hint: 'Ex.: Cachos' }), { type: 'images', path: 'photos', label: 'Fotos', captions: true }] },
+      { ...T('gallery.allLabel', 'Nome da aba com todas as fotos', { hint: 'Ex.: Todos' }), tpl: ['atelie'] },
+      T('gallery.eyebrow', 'Chamada'), T('gallery.title', 'Título'), T('gallery.highlight', 'Destaque'), { ...T('gallery.after', 'Texto depois do destaque'), tpl: ['atelie'] }, T('gallery.note', 'Texto ao lado'), { ...T('gallery.instagramText', 'Botão do Instagram', { hint: 'Ex.: Ver mais no Instagram ↗' }), tpl: ['atelie'] }] },
+    { not: ['atelie'], key: 'videos', title: 'Vídeos', ic: IC.video, toggle: true, fields: [
       { type: 'list', path: 'videos.items', label: 'Vídeos', itemLabel: (x, i) => x.label || 'Vídeo ' + (i + 1), add: () => ({ src: '', poster: '', label: '' }), fields: [{ type: 'video', path: 'src', label: 'Vídeo' }, T('label', 'Legenda'), { type: 'image', path: 'poster', label: 'Capa (opcional)' }] },
       T('videos.eyebrow', 'Chamada'), T('videos.title', 'Título'), T('videos.highlight', 'Destaque')] },
     { key: 'about', title: 'Sobre você', ic: IC.user, toggle: true, fields: [
-      { type: 'image', path: 'about.photo', label: 'Foto' }, T('about.eyebrow', 'Chamada'), T('about.title', 'Título'), T('about.highlight', 'Destaque'),
+      { type: 'image', path: 'about.photo', label: 'Foto' }, { type: 'image', path: 'about.photo2', label: 'Segunda foto', tpl: ['atelie'] }, T('about.eyebrow', 'Chamada'), T('about.title', 'Título'), T('about.highlight', 'Destaque'),
       { type: 'list', path: 'about.paragraphs', label: 'Parágrafos', simple: true, itemLabel: (x, i) => (x || '').slice(0, 40) || 'Parágrafo ' + (i + 1), add: () => '' },
-      { type: 'strings', path: 'about.tags', label: 'Etiquetas', placeholder: 'Ex.: Cuidado' }] },
+      { type: 'strings', path: 'about.tags', label: 'Etiquetas', placeholder: 'Ex.: Cuidado', not: ['atelie'] },
+      { type: 'list', path: 'about.pillars', label: 'Pilares', tpl: ['atelie'], itemLabel: (x, i) => x.t || 'Pilar ' + (i + 1), add: () => ({ t: '', d: '' }), fields: [T('t', 'Título'), T('d', 'Texto', { area: true })] },
+      { ...T('about.button', 'Texto do botão'), tpl: ['atelie'] }, { ...T('about.buttonMsg', 'Mensagem do WhatsApp do botão'), tpl: ['atelie'] }] },
+    { tpl: ['atelie'], key: 'steps', title: 'Como agendar (passos)', ic: IC.list, toggle: true, fields: [T('steps.eyebrow', 'Chamada'), T('steps.title', 'Título'), T('steps.highlight', 'Destaque'),
+      { type: 'list', path: 'steps.items', label: 'Passos', itemLabel: (x, i) => x.t || 'Passo ' + (i + 1), add: () => ({ t: '', d: '' }), fields: [T('t', 'Título'), T('d', 'Texto', { area: true })] }] },
+    { tpl: ['atelie'], key: 'spotlight', title: 'Destaque (faixa)', ic: IC.info, toggle: true, fields: [T('spotlight.eyebrow', 'Chamada'), T('spotlight.title', 'Título'), T('spotlight.highlight', 'Destaque'), T('spotlight.text', 'Texto', { area: true }), T('spotlight.icon', 'Emoji grande', { hint: 'Ex.: 🤟' })] },
     { key: 'services', title: 'Serviços e preços', ic: IC.list, toggle: true, fields: [
-      { type: 'list', path: 'services.items', label: 'Serviços', itemLabel: (x, i) => (x.name || 'Serviço ' + (i + 1)) + (x.price ? ' · R$ ' + x.price : ''), add: () => ({ name: '', price: '', desc: '', photo: '' }), fields: [T('name', 'Nome do serviço'), T('price', 'Preço', { hint: 'Ex.: 120,00' }), T('desc', 'Descrição curta', { area: true }), { type: 'image', path: 'photo', label: 'Foto do resultado' }] },
+      { type: 'list', path: 'services.items', label: 'Serviços', itemLabel: (x, i) => (x.name || 'Serviço ' + (i + 1)) + (x.price ? ' · R$ ' + x.price : ''), add: () => ({ name: '', price: '', desc: '', photo: '' }), fields: [T('name', 'Nome do serviço'), T('price', 'Preço', { hint: 'Ex.: 120,00' }), T('desc', 'Descrição curta', { area: true }), { type: 'image', path: 'photo', label: 'Foto do resultado' }, { type: 'strings', path: 'tags', label: 'Etiquetas', placeholder: 'Ex.: Balayage', tpl: ['atelie'] }, { ...T('cta', 'Texto do link', { hint: 'Ex.: Pedir valores ↗' }), tpl: ['atelie'] }, { ...T('msg', 'Mensagem do WhatsApp'), tpl: ['atelie'] }] },
       T('services.eyebrow', 'Chamada'), T('services.title', 'Título'), T('services.highlight', 'Destaque'), T('services.intro', 'Texto de introdução', { area: true }), T('services.note', 'Observação abaixo do carrossel')] },
-    { key: 'homeService', title: 'Atendimento a domicílio', ic: IC.pin, toggle: true, fields: [T('homeService.title', 'Título'), T('homeService.text', 'Texto', { area: true }), T('homeService.button', 'Texto do botão')] },
-    { key: 'info', title: 'Informações (abas)', ic: IC.info, toggle: true, fields: [
+    { not: ['atelie'], key: 'homeService', title: 'Atendimento a domicílio', ic: IC.pin, toggle: true, fields: [T('homeService.title', 'Título'), T('homeService.text', 'Texto', { area: true }), T('homeService.button', 'Texto do botão')] },
+    { not: ['atelie'], key: 'info', title: 'Informações (abas)', ic: IC.info, toggle: true, fields: [
       T('info.eyebrow', 'Chamada'), T('info.title', 'Título'), T('info.highlight', 'Destaque'),
       { type: 'list', path: 'info.tabs', label: 'Abas', itemLabel: (x, i) => x.label || 'Aba ' + (i + 1), add: () => ({ label: '', big: '', title: '', intro: '', items: [] }), fields: [
         T('label', 'Nome da aba'), T('big', 'Destaque grande', { hint: 'Ex.: 24h' }), T('title', 'Título'), T('intro', 'Introdução', { area: true }),
         { type: 'list', path: 'items', label: 'Itens', itemLabel: (x, i) => x.t || 'Item ' + (i + 1), add: () => ({ t: '', d: '' }), fields: [T('t', 'Texto em negrito'), T('d', 'Complemento')] }] }] },
-    { key: 'feedback', title: 'Depoimentos', ic: IC.quote, toggle: true, fields: [
+    { not: ['atelie'], key: 'feedback', title: 'Depoimentos', ic: IC.quote, toggle: true, fields: [
       { type: 'list', path: 'feedback.items', label: 'Depoimentos', itemLabel: (x, i) => (x.text || '').slice(0, 38) || 'Depoimento ' + (i + 1), add: () => ({ text: '', author: '' }), fields: [T('text', 'Depoimento', { area: true }), T('author', 'Quem disse (opcional)', { hint: 'Vazio aparece "Cliente"' })] },
       T('feedback.eyebrow', 'Chamada'), T('feedback.title', 'Título'), T('feedback.highlight', 'Destaque')] },
     { key: 'booking', title: 'Botão Agendar', ic: IC.clock, fields: [
@@ -590,8 +606,13 @@
     { key: 'contact', title: 'Contato e rodapé', ic: IC.chat, fields: [
       T('contact.whatsapp', 'WhatsApp que recebe os agendamentos', { hint: 'Com DDD. Ex.: 67 99999-9999' }), T('contact.instagram', 'Instagram (sem @)'), T('contact.address', 'Endereço completo'), T('contact.title', 'Título da chamada final'), T('contact.highlight', 'Destaque da chamada final'),
       T('contact.limit', 'Aviso piscando (modelo Tático)', { hint: 'Ex.: Vagas limitadas por grupo' }), T('contact.text', 'Texto da chamada final', { area: true }), T('contact.ctaText', 'Texto do botão da chamada final'),
-      { type: 'strings', path: 'contact.trust', label: 'Selos da chamada final', placeholder: 'Ex.: Gratuito' }, T('footer.disclaimer', 'Aviso no rodapé', { area: true, rows: 4 })] },
-    { key: 'legal', title: 'Termos e privacidade', ic: IC.info, fields: [
+      { type: 'strings', path: 'contact.trust', label: 'Selos da chamada final', placeholder: 'Ex.: Gratuito', not: ['atelie'] }, { ...T('footer.disclaimer', 'Aviso no rodapé', { area: true, rows: 4 }), not: ['atelie'] },
+      { ...T('contact.eyebrow', 'Chamada acima do título final'), tpl: ['atelie'] }, { ...T('contact.ctaMsg', 'Mensagem do WhatsApp do botão final'), tpl: ['atelie'] },
+      { ...T('contact.waPrefix', 'Início de todas as mensagens do WhatsApp', { hint: 'Ex.: Olá, Érica! 😊 ' }), tpl: ['atelie'] },
+      { ...T('contact.email', 'E-mail'), tpl: ['atelie'] }, { ...T('contact.mapsUrl', 'Link do mapa (opcional)'), tpl: ['atelie'] },
+      { ...T('contact.floatMsg', 'Mensagem do botão verde flutuante'), tpl: ['atelie'] }, { ...T('contact.barText', 'Texto da barra de baixo (celular)'), tpl: ['atelie'] },
+      { ...T('footer.left', 'Rodapé (esquerda)'), tpl: ['atelie'] }, { ...T('footer.right', 'Rodapé (direita)'), tpl: ['atelie'] }] },
+    { not: ['atelie'], key: 'legal', title: 'Termos e privacidade', ic: IC.info, fields: [
       T('legal.termos.updated', 'Termos — linha de atualização', { hint: 'Ex.: Última atualização: 25 de novembro de 2026' }),
       T('legal.termos.body', 'Termos de uso', { area: true, rows: 12, hint: 'Use "## " para títulos, "- " para itens e **negrito**. Vazio = sem página de termos.' }),
       T('legal.privacidade.updated', 'Privacidade — linha de atualização'),
@@ -640,7 +661,8 @@
       const tiles = arr.map((p, i) => h('div', { class: 'thumb' }, h('img', { src: p.src, alt: p.alt || '' }),
         h('div', { class: 'tb' },
           i > 0 ? h('button', { type: 'button', class: 'tbtn', 'aria-label': 'Mover para a esquerda', onclick: () => { arr.splice(i - 1, 0, arr.splice(i, 1)[0]); changed(); draw(); } }, icon(IC.left, 14)) : null,
-          h('button', { type: 'button', class: 'tbtn', 'aria-label': 'Remover foto', onclick: () => { arr.splice(i, 1); changed(); draw(); } }, icon(IC.x, 14)))));
+          h('button', { type: 'button', class: 'tbtn', 'aria-label': 'Remover foto', onclick: () => { arr.splice(i, 1); changed(); draw(); } }, icon(IC.x, 14))),
+        f.captions ? h('input', { class: 'cap-in', type: 'text', value: p.alt === 'Foto' ? '' : p.alt || '', placeholder: 'Legenda', 'aria-label': 'Legenda da foto ' + (i + 1), oninput: (ev) => { p.alt = ev.target.value; changed(); } }) : null));
       const add = h('button', { type: 'button', class: 'add-tile', onclick: async () => {
         const urls = await pickMedia({ kind: 'image', multiple: true });
         if (urls && urls.length) { const a = get(obj, f.path) || []; urls.forEach((u) => a.push({ src: u, alt: 'Foto' })); set(obj, f.path, a); changed(); draw(); }
@@ -707,7 +729,7 @@
       const draw = () => {
         const cur = obj.template || S.templates[0]?.id;
         wrap.replaceChildren(h('small', {}, 'Seus textos, fotos e serviços continuam iguais. Só muda o visual.'),
-          h('div', { class: 'tpl-grid', role: 'radiogroup', 'aria-label': 'Modelo da página' }, S.templates.map((t) => h('button', { type: 'button', class: 'tpl', role: 'radio', 'aria-checked': String(t.id === cur), onclick: () => { if (obj.template === t.id) return; obj.template = t.id; if (t.theme) obj.theme = { ...t.theme }; changed(); draw(); toast('Modelo ' + t.name + ' aplicado. As cores foram ajustadas, dá para mudar em Cores.'); } },
+          h('div', { class: 'tpl-grid', role: 'radiogroup', 'aria-label': 'Modelo da página' }, S.templates.map((t) => h('button', { type: 'button', class: 'tpl', role: 'radio', 'aria-checked': String(t.id === cur), onclick: () => { if (obj.template === t.id) return; obj.template = t.id; if (t.theme) obj.theme = { ...t.theme }; changed(); draw(); toast('Modelo ' + t.name + ' aplicado. As cores foram ajustadas, dá para mudar em Cores.'); setTimeout(() => pagePagina(), 50); } },
             h('span', { class: 'tpl-img' }, h('img', { src: t.thumb, alt: '' })), h('b', {}, t.name), h('small', {}, t.desc)))),
           S.templates.length === 1 ? h('small', {}, 'Novos modelos aparecem aqui assim que forem lançados.') : '');
       };
@@ -772,7 +794,9 @@
     box.append(topline('Editar página', 'Toque numa seção para editar. A prévia atualiza sozinha.',
       h('button', { class: 'btn btn-line pv-open', type: 'button', onclick: () => { pvCol.classList.add('open'); refreshPreview(); } }, icon(IC.eye, 18), 'Pré-visualizar'),
       h('a', { class: 'btn btn-line', href: S.me.url, target: '_blank', rel: 'noopener' }, 'Abrir página')));
-    const sections = h('div', { class: 'sections' }, SECTIONS.map((sec) => {
+    const tplNow = S.cfg.template || 'glamour';
+    const fits = (x) => (!x.tpl || x.tpl.includes(tplNow)) && (!x.not || !x.not.includes(tplNow));
+    const sections = h('div', { class: 'sections' }, SECTIONS.filter(fits).map((sec) => {
       const enabled = sec.toggle ? !!get(S.cfg, sec.key + '.enabled') : true;
       const off = h('span', { class: 'off', hidden: enabled }, 'Desligada');
       const body = h('div', { class: 'sec-body' });
@@ -781,7 +805,7 @@
         cb.addEventListener('change', () => { set(S.cfg, sec.key + '.enabled', cb.checked); off.hidden = cb.checked; changed(); });
         body.append(h('label', { class: 'toggle' }, h('span', {}, 'Mostrar na página', sec.toggleHint ? h('small', { class: 'muted', style: 'display:block;font-weight:400' }, sec.toggleHint) : null), h('span', { class: 'switch' }, cb, h('span'))));
       }
-      sec.fields.forEach((f) => body.append(renderField(S.cfg, f)));
+      sec.fields.filter(fits).forEach((f) => body.append(renderField(S.cfg, f)));
       return h('details', { class: 'sec-card' }, h('summary', { class: 'sec-sum' }, h('span', { class: 'ic' }, icon(sec.ic, 18)), sec.title, off, h('span', { class: 'chev' }, icon(IC.chev, 18))), body);
     }));
     pvFrame = h('iframe', { title: 'Prévia da página', sandbox: 'allow-scripts allow-popups' });
