@@ -699,7 +699,7 @@
         wrap.replaceChildren(h('small', {}, 'Seus textos, fotos e serviços continuam iguais. Só muda o visual.'),
           h('div', { class: 'tpl-grid', role: 'radiogroup', 'aria-label': 'Modelo da página' }, S.templates.map((t) => h('button', { type: 'button', class: 'tpl', role: 'radio', 'aria-checked': String(t.id === cur), onclick: () => { if (obj.template === t.id) return; obj.template = t.id; if (t.theme) obj.theme = { ...t.theme }; changed(); draw(); toast('Modelo ' + t.name + ' aplicado. As cores foram ajustadas, dá para mudar em Cores.'); } },
             h('span', { class: 'tpl-img' }, h('img', { src: t.thumb, alt: '' })), h('b', {}, t.name), h('small', {}, t.desc)))),
-          S.templates.length === 1 ? h('small', {}, 'Novos modelos aparecem aqui assim que forem lançados.') : null);
+          S.templates.length === 1 ? h('small', {}, 'Novos modelos aparecem aqui assim que forem lançados.') : '');
       };
       draw();
     })();
