@@ -1,5 +1,5 @@
 /* Service worker do painel: deixa o app instalável e abre mesmo com internet fraca. */
-const CACHE = 'ssite-painel-v2';
+const CACHE = 'ssite-painel-v3';
 const SHELL = ['/painel', '/static/app.css', '/static/panel.css', '/static/panel.js', '/icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {
