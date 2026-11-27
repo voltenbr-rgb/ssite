@@ -37,7 +37,7 @@ export function mdLite(text, e) {
 }
 
 export function makeTatico(H) {
-  const { e, safeUrl, color, digits, bookingModal, loop } = H;
+  const { e, safeUrl, color, digits, bookingModal, loop, bookingInfo } = H;
   const em = (t, hl) => `${e(t)}${hl ? ` <em>${e(hl)}</em>` : ''}`;
   const strong = (s) => e(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   const OK = '<svg aria-hidden="true"><use href="#ok"/></svg>';
@@ -86,7 +86,7 @@ ${preview ? '<meta name="robots" content="noindex">' : ''}
     const ctaUrl = safeUrl(c.cta?.url);
     const ctaText = c.cta?.text || (ctaUrl ? 'Fale conosco' : 'Agendar horário');
     const svcNames = (c.services?.items || []).map((x) => x.name).filter(Boolean);
-    const data = { slug: tenant.slug, wa, booking: !!c.booking?.enabled && !ctaUrl, preview, closed: c.booking?.closedWeekdays || [], services: svcNames, cta: ctaUrl };
+    const data = { slug: tenant.slug, wa, ...bookingInfo(tenant, c), preview, closed: c.booking?.closedWeekdays || [], services: svcNames, cta: ctaUrl };
     const json = JSON.stringify(data).replace(/</g, '\\u003c');
     const logo = safeUrl(h.photo) || safeUrl(c.about?.photo);
     const bg = safeUrl(h.bg) || safeUrl(c.gallery?.photos?.[0]?.src) || '';

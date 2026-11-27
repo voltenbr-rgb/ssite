@@ -112,7 +112,9 @@
   function openBooking(service, note) {
     if (SS.cta) { track('whatsapp', service || 'botão'); if (!SS.preview) window.open(SS.cta, '_blank', 'noopener'); return; }
     if (!bk) {
-      const text = 'Olá! Vim pelo site e quero agendar' + (service ? ': ' + service : ' um horário') + '.';
+      const text = SS.msg
+        ? SS.msg.replace(/\{servi[cç]o\}/gi, service || 'um horário')
+        : 'Olá! Vim pelo site e quero agendar' + (service ? ': ' + service : ' um horário') + '.';
       track('whatsapp', service || 'agendar');
       if (!SS.preview) window.open(waLink(text), '_blank', 'noopener');
       return;
@@ -161,7 +163,7 @@
         'Data: ' + dateBR + (f.time ? ' às ' + f.time : '') + '\n' +
         (f.note ? 'Obs.: ' + f.note.trim() + '\n' : '');
       // abre a janela já no clique (celulares bloqueiam janelas abertas depois de esperar a rede)
-      const win = SS.preview ? null : window.open('', '_blank');
+      const win = SS.preview || SS.thenWa === false ? null : window.open('', '_blank');
       if (!SS.preview) {
         try {
           const r = await fetch('/api/book', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: SS.slug, ...f, phone }) });
@@ -169,8 +171,13 @@
         } catch (_) { /* mesmo se falhar, segue para o WhatsApp */ }
       }
       msg.className = 'bk-msg ok';
-      msg.textContent = SS.preview ? 'Pré-visualização: na página real o WhatsApp abriria agora.' : 'Pedido enviado! Confirme a mensagem no WhatsApp.';
-      if (win) win.location.href = waLink(text); else if (!SS.preview) location.href = waLink(text);
+      if (SS.thenWa === false) {
+        msg.textContent = SS.preview ? 'Pré-visualização: na página real o pedido seria enviado agora.' : 'Pedido enviado! Em breve entraremos em contato para confirmar.';
+        if (!SS.preview) form.reset();
+      } else {
+        msg.textContent = SS.preview ? 'Pré-visualização: na página real o WhatsApp abriria agora.' : 'Pedido enviado! Confirme a mensagem no WhatsApp.';
+        if (win) win.location.href = waLink(text); else if (!SS.preview) location.href = waLink(text);
+      }
       btn.disabled = false;
       setTimeout(() => { if (!SS.preview) { form.reset(); closeBooking(); } }, 2500);
     });

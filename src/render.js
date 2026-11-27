@@ -199,6 +199,17 @@ ${wa ? `<div><div class="lbl">WhatsApp</div><a href="https://wa.me/${wa}" data-t
 </footer>`;
 }
 
+// Como o botão "Agendar" funciona nesta página:
+// form = formulário (fica na lista do painel e, se quiser, abre o WhatsApp para confirmar)
+// whatsapp = vai direto para o WhatsApp escolhido com a mensagem pronta
+export function bookingInfo(tenant, c) {
+  const b = c.booking || {};
+  const mode = b.mode || (b.enabled ? 'form' : 'whatsapp');
+  const raw = digits(b.whatsapp || c.contact?.whatsapp || tenant.whatsapp);
+  const wa = raw.length >= 10 && raw.length <= 11 ? '55' + raw : raw;
+  return { wa, booking: mode === 'form' && !safeUrl(c.cta?.url), msg: String(b.message || '').slice(0, 600), thenWa: b.thenWhatsapp !== false };
+}
+
 function bookingModal(c) {
   const b = c.booking || {};
   if (!b.enabled) return '';
@@ -231,7 +242,7 @@ function renderGlamour(tenant, config, { preview = false, offline = false, embed
   const name = c.brand?.name || tenant.business_name;
   const wa = digits(c.contact?.whatsapp || tenant.whatsapp);
   const svcNames = (c.services?.items || []).map((x) => x.name).filter(Boolean);
-  const data = { slug: tenant.slug, wa, booking: !!c.booking?.enabled && !safeUrl(c.cta?.url), preview, closed: c.booking?.closedWeekdays || [], services: svcNames, cta: safeUrl(c.cta?.url) };
+  const data = { slug: tenant.slug, wa, ...bookingInfo(tenant, c), preview, closed: c.booking?.closedWeekdays || [], services: svcNames, cta: safeUrl(c.cta?.url) };
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
   const description = c.hero?.subtitle || `${name} · ${c.brand?.tagline || ''}`;
   const ogImg = safeUrl(c.hero?.photo);
@@ -290,7 +301,7 @@ ${body}
 /* ---------------- Modelos de página ----------------
    Cada modelo recebe a MESMA configuração (seções, fotos, serviços…) e desenha do seu jeito.
    Para adicionar um modelo: crie a função render e registre aqui. */
-const tatico = makeTatico({ e, safeUrl, color, digits, bookingModal, loop });
+const tatico = makeTatico({ e, safeUrl, color, digits, bookingModal, loop, bookingInfo });
 
 export const TEMPLATES = {
   glamour: {

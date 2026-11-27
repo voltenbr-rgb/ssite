@@ -576,7 +576,12 @@
     { key: 'feedback', title: 'Depoimentos', ic: IC.quote, toggle: true, fields: [
       { type: 'list', path: 'feedback.items', label: 'Depoimentos', itemLabel: (x, i) => (x.text || '').slice(0, 38) || 'Depoimento ' + (i + 1), add: () => ({ text: '', author: '' }), fields: [T('text', 'Depoimento', { area: true }), T('author', 'Quem disse (opcional)', { hint: 'Vazio aparece "Cliente"' })] },
       T('feedback.eyebrow', 'Chamada'), T('feedback.title', 'Título'), T('feedback.highlight', 'Destaque')] },
-    { key: 'booking', title: 'Agendamento', ic: IC.clock, toggle: true, toggleHint: 'Desligado: os botões abrem direto o WhatsApp.', fields: [
+    { key: 'booking', title: 'Botão Agendar', ic: IC.clock, fields: [
+      { type: 'select', path: 'booking.mode', label: 'O que acontece quando o cliente toca em Agendar', options: [['form', 'Formulário (vai para o painel)'], ['whatsapp', 'Direto para o WhatsApp']],
+        get: (o) => o.booking?.mode || (o.booking?.enabled ? 'form' : 'whatsapp'), onSet: (o, v) => { o.booking = o.booking || {}; o.booking.enabled = v === 'form'; } },
+      T('booking.whatsapp', 'WhatsApp que recebe os pedidos', { hint: 'Com DDD. Ex.: 67 99999-9999. Vazio = usa o WhatsApp de Contato.' }),
+      T('booking.message', 'Mensagem pronta do WhatsApp', { area: true, placeholder: 'Olá! Vim pelo site e quero agendar {serviço}.', hint: 'Usada quando o botão vai direto ao WhatsApp. Escreva {serviço} para incluir o serviço escolhido.' }),
+      { type: 'bool', path: 'booking.thenWhatsapp', label: 'No formulário, abrir o WhatsApp depois de enviar', hint: 'Desligado: o pedido só aparece na lista do painel.' },
       T('booking.title', 'Título do formulário'), { type: 'strings', path: 'booking.times', label: 'Horários oferecidos', placeholder: 'Ex.: 14:30', time: true }, { type: 'weekdays', path: 'booking.closedWeekdays', label: 'Dias sem atendimento' }] },
     { key: 'contact', title: 'Contato e rodapé', ic: IC.chat, fields: [
       T('contact.whatsapp', 'WhatsApp que recebe os agendamentos', { hint: 'Com DDD. Ex.: 67 99999-9999' }), T('contact.instagram', 'Instagram (sem @)'), T('contact.address', 'Endereço completo'), T('contact.title', 'Título da chamada final'), T('contact.highlight', 'Destaque da chamada final'),
@@ -686,8 +691,9 @@
   }
   function fieldSelect(obj, f) {
     const id = 'f' + Math.random().toString(36).slice(2, 8);
-    const sel = h('select', { id }, f.options.map(([v, l]) => h('option', { value: v, selected: (get(obj, f.path) ?? f.options[0][0]) === v }, l)));
-    sel.addEventListener('change', () => { set(obj, f.path, sel.value); changed(); f.onInput && f.onInput(); });
+    const cur = f.get ? f.get(obj) : (get(obj, f.path) ?? f.options[0][0]);
+    const sel = h('select', { id }, f.options.map(([v, l]) => h('option', { value: v, selected: cur === v }, l)));
+    sel.addEventListener('change', () => { set(obj, f.path, sel.value); f.onSet && f.onSet(obj, sel.value); changed(); f.onInput && f.onInput(); });
     return h('div', { class: 'f' }, h('label', { for: id }, f.label), sel, f.hint ? h('small', {}, f.hint) : null);
   }
   function fieldTemplate(obj) {
