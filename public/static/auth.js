@@ -10,9 +10,39 @@
     const d = Object.fromEntries(new FormData(login));
     if (!d.login || !d.password) { err.textContent = 'Preencha usuário e senha.'; return; }
     btn.disabled = true; err.textContent = '';
-    try { await post('/api/login', d); location.href = '/painel'; }
+    try {
+      const r = await post('/api/login', d);
+      if (r && r.pages && r.pages.length > 1) return choosePage(r.pages);
+      location.href = '/painel';
+    }
     catch (x) { err.textContent = x.message; btn.disabled = false; }
   });
+
+  // Conta com várias páginas: escolhe qual abrir
+  function choosePage(pages) {
+    const card = login.closest('.auth-card') || login.parentElement;
+    const box = document.createElement('div');
+    box.className = 'page-pick';
+    box.innerHTML = '<h2>Qual página você quer abrir?</h2><p class="hint">Dá para trocar depois pelo seletor no topo do painel.</p>';
+    pages.forEach((pg) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'pick';
+      const ini = pg.business_name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+      b.innerHTML = '<span class="pick-ini"></span><span class="pick-t"><b></b><small></small></span><span class="pick-go">›</span>';
+      b.querySelector('.pick-ini').textContent = ini;
+      b.querySelector('b').textContent = pg.business_name;
+      b.querySelector('small').textContent = pg.slug + (pg.main ? ' · principal' : '');
+      b.addEventListener('click', async () => {
+        box.querySelectorAll('button').forEach((x) => (x.disabled = true));
+        b.classList.add('busy');
+        try { await post('/api/pages/switch', { id: pg.id }); } catch (_) {}
+        location.href = '/painel';
+      });
+      box.append(b);
+    });
+    login.hidden = true;
+    login.after(box);
+  }
 
   const signup = document.getElementById('signup');
   if (!signup) return;

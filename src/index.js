@@ -201,13 +201,17 @@ async function api(request, env, url) {
     const key = slugify(login).replace(/-/g, ''); // "Vitória Carvalho" -> "vitoriacarvalho"
     const digits = login.replace(/\D/g, '');
     const isPhone = digits.length >= 10 && digits.length <= 13 && /^[\d\s()+.-]+$/.test(login);
+    // Telefone: aceita com ou sem traço, espaço, parênteses, +55 e com ou sem o 9 da frente
+    const nat = digits.length >= 12 && digits.startsWith('55') ? digits.slice(2) : digits;
     const t = isPhone
-      ? await env.DB.prepare('SELECT * FROM tenants WHERE (whatsapp = ? OR whatsapp = ?) ORDER BY (parent_id IS NOT NULL) LIMIT 1').bind(phoneKey(digits), digits).first()
+      ? ((await env.DB.prepare('SELECT * FROM tenants WHERE substr(whatsapp, -8) = ? ORDER BY (parent_id IS NOT NULL), id').bind(nat.slice(-8)).all()).results
+          .find((x) => { const w = String(x.whatsapp || '').replace(/\D/g, ''); return (w.length >= 12 && w.startsWith('55') ? w.slice(2) : w).slice(0, 2) === nat.slice(0, 2); }) || null)
       : await env.DB.prepare("SELECT * FROM tenants WHERE replace(lower(username), '-', '') = ? OR lower(email) = ? OR replace(slug, '-', '') = ? ORDER BY (parent_id IS NOT NULL) LIMIT 1").bind(key, login, key).first();
     const acc = await accountOf(env, t);
     if (!acc || !(await verifyPassword(String(d.password || ''), acc.password_hash))) return err('Usuário ou senha incorretos.', 401);
     const token = await createSession(env, { tenantId: t.id, accountId: acc.id });
-    return json({ ok: true }, 200, { 'Set-Cookie': cookie('ss_sess', token, { secure }) });
+    const pages = (await accountPages(env, acc)).map((x) => ({ id: x.id, slug: x.slug, business_name: x.business_name, main: !x.parent_id }));
+    return json({ ok: true, pages: pages.length > 1 ? pages : [] }, 200, { 'Set-Cookie': cookie('ss_sess', token, { secure }) });
   }
   if (p === '/api/logout' && m === 'POST') {
     await destroySession(env, request, 'ss_sess');
@@ -472,11 +476,13 @@ async function adminApi(request, env, url, secure) {
     if ((paid || '').slice(0, 10) !== (t.paid_until || '').slice(0, 10)) changes.push(`Pago até: ${paid ? paid.split('-').reverse().join('/') : '—'}`);
     if (trial !== t.trial_ends) changes.push(`Teste até: ${(trial || '').slice(0, 10).split('-').reverse().join('/')}`);
     if (slug !== t.slug) changes.push(`Link: ${t.slug} → ${slug}`);
+    if (d.new_password && passError(String(d.new_password))) return err(passError(String(d.new_password)));
     if (d.new_password) changes.push('Senha redefinida');
     if (changes.length || note) await env.DB.prepare('INSERT INTO admin_log (tenant_id, tenant, action, note) VALUES (?, ?, ?, ?)').bind(t.id, t.business_name, changes.join(' · ') || 'Observação', note || null).run();
     if (d.new_password) {
-      if (passError(String(d.new_password))) return err(passError(String(d.new_password)));
-      await env.DB.prepare('UPDATE tenants SET password_hash = ? WHERE id = ?').bind(await hashPassword(String(d.new_password)), t.id).run();
+      // A senha é da conta: vale para a página principal e todas as páginas extras
+      const accId = t.parent_id || t.id;
+      await env.DB.prepare('UPDATE tenants SET password_hash = ? WHERE id = ? OR parent_id = ?').bind(await hashPassword(String(d.new_password)), accId, accId).run();
     }
     return json({ ok: true });
   }

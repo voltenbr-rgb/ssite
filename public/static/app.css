@@ -145,3 +145,16 @@ h1{margin:0;font:600 clamp(2.5rem,5.6vw,4.4rem)/1.02 Outfit,sans-serif;letter-sp
 .pw-meter span{display:block;height:100%;width:0;border-radius:3px;transition:width .25s,background-color .25s}
 .loading{padding:40px;text-align:center;color:var(--muted)}
 @media (prefers-reduced-motion: reduce){.step{animation:none}.device{transition:none}}
+
+/* Escolha de página no login */
+.page-pick{display:grid;gap:10px}
+.page-pick h2{font-size:22px;margin:0}
+.page-pick .hint{margin:0 0 6px}
+.pick{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border:1px solid rgba(0,0,0,.1);border-radius:18px;background:#fff;font:inherit;text-align:left;cursor:pointer;transition:transform .15s,border-color .15s}
+.pick:hover{border-color:#111;transform:translateY(-1px)}
+.pick.busy{opacity:.6}
+.pick-ini{flex:none;width:42px;height:42px;border-radius:50%;background:var(--lime,#CDF56A);display:grid;place-items:center;font-weight:700}
+.pick-t{flex:1;min-width:0;display:grid}
+.pick-t b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pick-t small{color:#777}
+.pick-go{font-size:24px;color:#999}
