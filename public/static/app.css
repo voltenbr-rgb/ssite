@@ -158,3 +158,28 @@ h1{margin:0;font:600 clamp(2.5rem,5.6vw,4.4rem)/1.02 Outfit,sans-serif;letter-sp
 .pick-t b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pick-t small{color:#777}
 .pick-go{font-size:24px;color:#999}
+
+/* Carrossel de exemplos no celular da capa */
+.demo-track{position:absolute;inset:0;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.demo-track::-webkit-scrollbar{display:none}
+.demo-slide{position:relative;flex:0 0 100%;height:100%;scroll-snap-align:start;overflow:hidden;display:block}
+.demo-slide iframe{position:absolute;top:0;left:0;width:390px;height:844px;border:0;transform-origin:0 0;pointer-events:none}
+.device:hover{transform:none}
+.demo-nav{position:relative;z-index:1;display:flex;align-items:center;gap:10px}
+.demo-arrow{width:38px;height:38px;border-radius:50%;border:0;background:#fff;font:600 22px/1 Outfit,sans-serif;color:#111;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.demo-arrow:hover{background:var(--lime)}
+.demo-dots{display:flex;gap:6px}
+.demo-dot{width:9px;height:9px;padding:0;border-radius:99px;border:0;background:#BDBDBD;cursor:pointer;transition:width .25s,background .25s}
+.demo-dot.on{width:26px;background:#111}
+/* Planos */
+.plans{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.plan{background:#fff;border-radius:28px;padding:26px;display:flex;flex-direction:column;gap:10px}
+.plan.hot{background:#111;color:#fff}.plan.hot .muted{color:#BDBDBD}
+.plan-tag{align-self:flex-start;background:var(--lime);color:#111;border-radius:999px;padding:4px 12px;font-weight:600;font-size:13px}
+.plan-price{margin:6px 0 0;font:600 44px/1 Outfit,sans-serif;letter-spacing:-.02em}
+.plan-price small{font-size:16px;font-weight:500;margin:0 4px}
+.plan .incl{margin:6px 0 10px;flex:1}
+.plan.hot .btn-main{background:var(--lime);color:#111}
+@media (max-width:700px){.plans{grid-template-columns:1fr}}
+.plan .incl{grid-template-columns:1fr;grid-row:auto;gap:10px}
+.plan .incl li{color:#222}.plan.hot .incl li{color:#eee}

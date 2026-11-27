@@ -65,6 +65,16 @@ async function accountOf(env, t) {
   if (!t || !t.parent_id) return t;
   return (await env.DB.prepare('SELECT * FROM tenants WHERE id = ?').bind(t.parent_id).first()) || t;
 }
+// Foto de perfil da página: a escolhida no painel, senão a foto da capa, senão a primeira foto enviada
+const okImg = (u) => { u = String(u || '').trim(); return /^(\/m\/[\w-]+|\/seed\/[\w./-]+|https:\/\/[^\s"'<>]+)$/.test(u) ? u : ''; };
+async function avatarOf(env, t) {
+  if (okImg(t.avatar)) return t.avatar;
+  const pg = await env.DB.prepare("SELECT json_extract(config, '$.hero.photo') AS photo FROM pages WHERE tenant_id = ?").bind(t.id).first();
+  if (okImg(pg?.photo)) return pg.photo;
+  const md = await env.DB.prepare("SELECT id FROM media WHERE tenant_id = ? AND kind = 'image' ORDER BY created_at LIMIT 1").bind(t.id).first();
+  return md ? '/m/' + md.id : '';
+}
+
 async function serveTenantPage(env, slug, embed = false, base = '', legal = null) {
   const t = await getTenantBySlug(env, slug);
   if (!t) return html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Página não encontrada</title><body style="font-family:system-ui;background:#0F0A10;color:#F7F0E6;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center"><div><h1>Página não encontrada</h1><p>Confira o endereço digitado.</p></div>`, 404);
@@ -233,15 +243,17 @@ async function api(request, env, url) {
     const pages = await accountPages(env, acc);
     const ids = pages.map((x) => x.id);
     const qs = ids.map(() => '?').join(',');
-    const [ev, bk] = await env.DB.batch([
+    const [ev, bk, cv] = await env.DB.batch([
       env.DB.prepare(`SELECT tenant_id, type, COUNT(*) AS n FROM events WHERE tenant_id IN (${qs}) AND day >= ? GROUP BY tenant_id, type`).bind(...ids, from),
       env.DB.prepare(`SELECT tenant_id, COUNT(*) AS n, SUM(CASE WHEN status = 'novo' THEN 1 ELSE 0 END) AS pending FROM bookings WHERE tenant_id IN (${qs}) GROUP BY tenant_id`).bind(...ids),
+      env.DB.prepare(`SELECT tenant_id, json_extract(config, '$.hero.photo') AS photo FROM pages WHERE tenant_id IN (${qs})`).bind(...ids),
     ]);
+    const covers = {}; cv.results.forEach((r) => { covers[r.tenant_id] = okImg(r.photo); });
     const stats = {}; ev.results.forEach((r) => { (stats[r.tenant_id] = stats[r.tenant_id] || {})[r.type] = r.n; });
     const bks = {}; bk.results.forEach((r) => { bks[r.tenant_id] = r; });
     return json({
       days, current: t.id, max: acc.max_pages || 1, tier: acc.tier || 'simples',
-      pages: pages.map((x) => ({ id: x.id, slug: x.slug, business_name: x.business_name, url: publicUrl(env, url, x.slug), main: !x.parent_id,
+      pages: pages.map((x) => ({ id: x.id, slug: x.slug, business_name: x.business_name, url: publicUrl(env, url, x.slug), main: !x.parent_id, avatar: okImg(x.avatar) || covers[x.id] || '',
         views: stats[x.id]?.view || 0, clicks: (stats[x.id]?.whatsapp || 0) + (stats[x.id]?.booking_open || 0), services: stats[x.id]?.service || 0,
         bookings_period: stats[x.id]?.booking || 0, bookings: bks[x.id]?.n || 0, pending: bks[x.id]?.pending || 0 })),
     });
@@ -272,7 +284,7 @@ async function api(request, env, url) {
     return json({ ok: true, id: res.id, slug });
   }
 
-  if (p === '/api/me' && m === 'GET') return json({ tenant: { ...publicTenant(t, env, url), state: tenantState(acc), plan: acc.plan, tier: acc.tier || 'simples', trial_ends: acc.trial_ends, paid_until: acc.paid_until, status: acc.status, main: !t.parent_id, account_username: acc.username, max_pages: acc.max_pages || 1 }, plans: PLANS, segments: SEGMENTS, brand: brand(env), support: String(env.SUPPORT_WHATSAPP || '').replace(/\D/g, ''), root: rootDomain(env) });
+  if (p === '/api/me' && m === 'GET') return json({ tenant: { ...publicTenant(t, env, url), avatar: await avatarOf(env, t), avatar_custom: !!okImg(t.avatar), state: tenantState(acc), plan: acc.plan, tier: acc.tier || 'simples', trial_ends: acc.trial_ends, paid_until: acc.paid_until, status: acc.status, main: !t.parent_id, account_username: acc.username, max_pages: acc.max_pages || 1 }, plans: PLANS, segments: SEGMENTS, brand: brand(env), support: String(env.SUPPORT_WHATSAPP || '').replace(/\D/g, ''), root: rootDomain(env) });
   if (p === '/api/me' && m === 'PUT') {
     const d = await body(request);
     const email = clean(d.email, 120).toLowerCase();
@@ -291,6 +303,13 @@ async function api(request, env, url) {
         .bind(clean(d.business_name, 80) || t.business_name, clean(d.owner_name, 80) || t.owner_name, email || null, wa || t.whatsapp, clean(d.segment, 40), t.id).run();
     } catch { return err('Esse e-mail já está em uso.', 409); }
     return json({ ok: true });
+  }
+  if (p === '/api/me/avatar' && m === 'PUT') {
+    const d = await body(request);
+    const src = okImg(d.src);
+    if (d.src && !src) return err('Foto inválida.');
+    await env.DB.prepare('UPDATE tenants SET avatar = ? WHERE id = ?').bind(src || null, t.id).run();
+    return json({ ok: true, avatar: await avatarOf(env, { ...t, avatar: src }) });
   }
   if (p === '/api/me/password' && m === 'POST') {
     const d = await body(request);
@@ -578,7 +597,12 @@ export default {
       if (sm) return await serveTenantPage(env, sm[1], url.searchParams.has('embed'), `/s/${sm[1]}`, sm[2] || null);
 
       const B = brand(env);
-      if (p === '/') return html(landingPage({ brand: B, trialDays: TRIAL_DAYS, demo: '/s/' + (env.DEMO_SLUG || 'vitoriacarvalho') }));
+      if (p === '/') {
+        const slugs = String(env.DEMO_SLUGS || [env.DEMO_SLUG || 'vitoriacarvalho', 'toymaster'].join(',')).split(',').map((x) => x.trim()).filter(Boolean);
+        const rows = slugs.length ? (await env.DB.prepare(`SELECT slug, business_name FROM tenants WHERE slug IN (${slugs.map(() => '?').join(',')})`).bind(...slugs).all()).results : [];
+        const demos = slugs.map((sl) => rows.find((r) => r.slug === sl)).filter(Boolean).map((r) => ({ url: '/s/' + r.slug, name: r.business_name }));
+        return html(landingPage({ brand: B, trialDays: TRIAL_DAYS, demo: '/s/' + slugs[0], demos }));
+      }
       if (p === '/cadastro') return html(signupPage({ brand: B, segments: SEGMENTS, trialDays: TRIAL_DAYS, root, templates: templateList() }));
       if (p === '/entrar') return html(loginPage({ brand: B }));
       if (p === '/painel' || p.startsWith('/painel/')) return html(appShell({ brand: B, kind: 'panel' }), 200, { 'Cache-Control': 'no-store' });

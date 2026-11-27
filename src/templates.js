@@ -35,7 +35,8 @@ const I = {
   link: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>',
 };
 
-export function landingPage({ brand, trialDays, demo }) {
+export function landingPage({ brand, trialDays, demo, demos = [] }) {
+  if (!demos.length) demos = [{ url: demo, name: 'Página de exemplo' }];
   const year = new Date().getFullYear();
   const features = [
     [I.edit, 'Edite sozinha, pelo celular', 'Troque textos, cores, fotos, vídeos, serviços e preços em minutos, vendo a prévia ao vivo.'],
@@ -48,7 +49,7 @@ export function landingPage({ brand, trialDays, demo }) {
   const included = ['Página profissional completa', 'Agendamentos ilimitados', 'Painel com métricas', 'Fotos e vídeos em carrosséis', 'Endereço com o seu nome', 'App do painel no celular e no computador'];
   return shell(`${brand} · Seu site com agendamento em minutos`, `
 <header class="topbar"><div class="wrap topbar-in">${logo(brand)}
-<nav class="topnav"><a href="#recursos">Recursos</a><a href="#exemplo">Exemplo</a><a href="/entrar" class="btn btn-line btn-sm">Entrar</a></nav></div></header>
+<nav class="topnav"><a href="#recursos">Recursos</a><a href="#planos">Planos</a><a href="/entrar" class="btn btn-line btn-sm">Entrar</a></nav></div></header>
 <main>
 <section class="wrap hero">
 <div class="hero-copy">
@@ -59,16 +60,24 @@ export function landingPage({ brand, trialDays, demo }) {
 <div class="hero-stats"><div><b>2</b><span>minutos para criar</span></div><div><b>${trialDays}</b><span>dias grátis</span></div><div><b>0</b><span>cartão de crédito</span></div></div>
 </div>
 <div class="hero-phone" id="exemplo">
-<a class="device" href="${e(demo)}" target="_blank" rel="noopener" aria-label="Abrir a página de exemplo da Vitória Carvalho">
+<div class="device" role="region" aria-roledescription="carrossel" aria-label="Páginas reais de clientes">
 <span class="device-btn b1" aria-hidden="true"></span><span class="device-btn b2" aria-hidden="true"></span><span class="device-btn b3" aria-hidden="true"></span>
-<span class="device-screen"><iframe src="${e(demo)}?embed=1" title="Página de exemplo" loading="lazy" tabindex="-1" scrolling="no"></iframe><span class="device-notch" aria-hidden="true"></span></span>
-</a>
-<p class="device-cap">Página real de uma cliente · <a href="${e(demo)}" target="_blank" rel="noopener">abrir</a></p>
+<span class="device-screen"><span class="demo-track">${demos.map((d, i) => `<a class="demo-slide" href="${e(d.url)}" target="_blank" rel="noopener" aria-label="Abrir a página ${e(d.name)}" data-src="${e(d.url)}?embed=1">${i === 0 ? `<iframe src="${e(d.url)}?embed=1" title="${e(d.name)}" tabindex="-1" scrolling="no"></iframe>` : ''}</a>`).join('')}</span><span class="device-notch" aria-hidden="true"></span></span>
+</div>
+${demos.length > 1 ? `<div class="demo-nav"><button type="button" class="demo-arrow" data-dir="-1" aria-label="Exemplo anterior">‹</button><span class="demo-dots">${demos.map((d, i) => `<button type="button" class="demo-dot${i ? '' : ' on'}" data-i="${i}" aria-label="Ver ${e(d.name)}"></button>`).join('')}</span><button type="button" class="demo-arrow" data-dir="1" aria-label="Próximo exemplo">›</button></div>` : ''}
+<p class="device-cap"><span class="demo-name">${e(demos[0].name)}</span> · <a class="demo-open" href="${e(demos[0].url)}" target="_blank" rel="noopener">abrir</a></p>
 </div>
 </section>
 <section id="recursos" class="wrap sec">
 <div class="sec-head"><h2 class="h2">Tudo numa página só</h2><a href="/cadastro" class="btn btn-main btn-sm">Começar grátis</a></div>
 <div class="grid3">${features.map(([ic, t, d]) => `<div class="feat-wrap"><div class="feat"><span class="feat-ic">${ic}</span><h3>${e(t)}</h3><p>${e(d)}</p></div><a class="corner" href="/cadastro" aria-label="Começar grátis: ${e(t)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 17L17 7M8 7h9v9"/></svg></a></div>`).join('')}</div>
+</section>
+<section id="planos" class="wrap sec">
+<div class="sec-head"><h2 class="h2">Planos</h2><span class="muted">${trialDays} dias grátis em qualquer plano</span></div>
+<div class="plans">
+<div class="plan"><span class="plan-tag">Essencial</span><p class="plan-price"><small>R$</small>39,90<small>/mês</small></p><p class="muted">Para quem tem um negócio.</p><ul class="incl">${['1 página', 'Agendamentos ilimitados', 'Painel com métricas', 'Endereço com o seu nome'].map((x) => `<li>${I.check} ${e(x)}</li>`).join('')}</ul><a href="/cadastro" class="btn btn-line btn-lg">Começar grátis</a></div>
+<div class="plan hot"><span class="plan-tag">Completo</span><p class="plan-price"><small>R$</small>59,90<small>/mês</small></p><p class="muted">Para quem tem mais de um negócio.</p><ul class="incl">${['Até 3 páginas', 'Tudo do Essencial', 'Métricas de todas as páginas juntas', 'Troca de página com um toque'].map((x) => `<li>${I.check} ${e(x)}</li>`).join('')}</ul><a href="/cadastro" class="btn btn-main btn-lg">Começar grátis</a></div>
+</div>
 </section>
 <section class="wrap sec">
 <div class="cta-box">
@@ -95,9 +104,20 @@ export function landingPage({ brand, trialDays, demo }) {
 <script>
 try{navigator.sendBeacon('/api/site-event',new Blob([JSON.stringify({type:'landing',label:document.referrer?new URL(document.referrer).hostname:''})],{type:'application/json'}))}catch(_){}
 /* encaixa a página de exemplo (390×844) dentro da tela do celular, sem distorcer */
-(function(){var s=document.querySelector('.device-screen'),f=s&&s.querySelector('iframe');if(!f)return;
-function fit(){var k=s.clientWidth/390;f.style.transform='scale('+k+')';}
-fit();if(window.ResizeObserver)new ResizeObserver(fit).observe(s);else addEventListener('resize',fit);})();
+/* carrossel de exemplos: arrasta para o lado, pontos e setas; cada página carrega só quando aparece */
+(function(){var s=document.querySelector('.device-screen'),t=s&&s.querySelector('.demo-track');if(!t)return;
+var slides=[].slice.call(t.children),dots=[].slice.call(document.querySelectorAll('.demo-dot')),nm=document.querySelector('.demo-name'),op=document.querySelector('.demo-open'),cur=0,timer;
+function fit(){var k=s.clientWidth/390;t.querySelectorAll('iframe').forEach(function(f){f.style.transform='scale('+k+')';});}
+function load(i){var a=slides[i];if(a&&!a.querySelector('iframe')){var f=document.createElement('iframe');f.src=a.dataset.src;f.title=a.getAttribute('aria-label');f.tabIndex=-1;f.setAttribute('scrolling','no');a.appendChild(f);fit();}}
+function mark(i){cur=i;dots.forEach(function(d,j){d.classList.toggle('on',j===i)});var a=slides[i];if(nm)nm.textContent=a.getAttribute('aria-label').replace('Abrir a página ','');if(op)op.href=a.href;load(i);load(i+1);}
+function go(i){i=(i+slides.length)%slides.length;t.scrollTo({left:i*t.clientWidth,behavior:'smooth'});mark(i);}
+function auto(){clearInterval(timer);if(slides.length>1&&!matchMedia('(prefers-reduced-motion: reduce)').matches)timer=setInterval(function(){go(cur+1)},6000);}
+t.addEventListener('scroll',function(){var i=Math.round(t.scrollLeft/t.clientWidth);if(i!==cur)mark(i);},{passive:true});
+t.addEventListener('pointerdown',function(){clearInterval(timer)});t.addEventListener('pointerup',auto);
+dots.forEach(function(d){d.addEventListener('click',function(){go(+d.dataset.i);auto();})});
+document.querySelectorAll('.demo-arrow').forEach(function(b){b.addEventListener('click',function(){go(cur+(+b.dataset.dir));auto();})});
+fit();if(window.ResizeObserver)new ResizeObserver(fit).observe(s);else addEventListener('resize',fit);
+setTimeout(function(){load(1)},2500);auto();})();
 </script>`,
   { desc: 'Crie seu site com agendamento online, carrosséis de fotos e métricas. Comece grátis.' });
 }

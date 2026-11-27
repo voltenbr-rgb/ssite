@@ -12,6 +12,7 @@ db.exec(readFileSync(root + 'migrations/0002_seed_vitoria.sql', 'utf8'));
 db.exec(readFileSync(root + 'migrations/0003_site_events.sql', 'utf8'));
 db.exec(readFileSync(root + 'migrations/0004_tiers_admin_log.sql', 'utf8'));
 db.exec(readFileSync(root + 'migrations/0005_multi_pages.sql', 'utf8'));
+db.exec(readFileSync(root + 'migrations/0006_avatar.sql', 'utf8'));
 
 class Stmt {
   constructor(sql) { this.sql = sql; this.args = []; }

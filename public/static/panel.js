@@ -125,6 +125,10 @@
 
   const brToday = () => new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 10);
   const initialsOf = (n) => String(n || '?').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  // Bolinha com a foto da página (ou as iniciais, se ainda não tiver foto)
+  const avatarBox = (src, text, cls, attrs = {}) => src
+    ? h('span', { class: cls + ' has-img', 'aria-hidden': 'true', ...attrs }, h('img', { src, alt: '', loading: 'lazy', decoding: 'async' }))
+    : h('span', { class: cls, 'aria-hidden': 'true', ...attrs }, text);
   const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
   /* ---------- várias páginas na mesma conta ---------- */
@@ -144,9 +148,9 @@
     const cur = P.pages.find((x) => x.id === P.current) || P.pages[0];
     const menu = h('div', { class: 'pg-menu', role: 'menu' },
       P.pages.map((x) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(x.id === P.current), class: 'pg-item', onclick: () => { det.open = false; if (x.id !== P.current) switchPage(x.id); } },
-        h('span', { class: 'av' + (x.id === P.current ? '' : ' dark'), 'aria-hidden': 'true' }, initialsOf(x.business_name)), h('span', { class: 'pg-t' }, h('b', {}, x.business_name), h('small', {}, x.slug)), x.pending ? h('span', { class: 'count-s' }, x.pending) : null)),
+        avatarBox(x.avatar, initialsOf(x.business_name), 'av' + (x.id === P.current ? '' : ' dark')), h('span', { class: 'pg-t' }, h('b', {}, x.business_name), h('small', {}, x.slug)), x.pending ? h('span', { class: 'count-s' }, x.pending) : null)),
       h('button', { type: 'button', class: 'pg-add', role: 'menuitem', onclick: () => { det.open = false; addPageDialog(); } }, icon(IC.plus, 16), `Adicionar página (${P.pages.length}/${P.max})`));
-    const det = h('details', { class: 'pg-sw' }, h('summary', { 'aria-label': 'Trocar de página' }, h('span', { class: 'av', 'aria-hidden': 'true' }, initialsOf(cur.business_name)), h('span', { class: 'pg-cur' }, cur.business_name), icon(IC.chev, 16)), menu);
+    const det = h('details', { class: 'pg-sw' }, h('summary', { 'aria-label': 'Trocar de página' }, avatarBox(cur.avatar, initialsOf(cur.business_name), 'av'), h('span', { class: 'pg-cur' }, cur.business_name), icon(IC.chev, 16)), menu);
     document.addEventListener('click', (e) => { if (det.open && !det.contains(e.target)) det.open = false; });
     return det;
   }
@@ -205,13 +209,13 @@
         : h('div', { class: 'agenda-line empty' }, 'Nenhum atendimento marcado para hoje'),
       h('a', { class: 'agenda-go', href: '#agendamentos', 'aria-label': 'Ver todos os agendamentos' }, icon(IC.right, 18)));
     const top = h('header', { class: 'ws-top' },
-      h('a', { href: '#inicio', class: 'ws-logo', 'aria-label': BRAND }, BRAND.slice(0, 1).toUpperCase()),
+      h('a', { href: '#conta', class: 'ws-logo' + (S.me.avatar ? ' has-img' : ''), 'aria-label': 'Foto e dados da página', title: 'Trocar foto' }, S.me.avatar ? h('img', { src: S.me.avatar, alt: '' }) : BRAND.slice(0, 1).toUpperCase()),
       pageSwitcher(),
       agenda,
       h('div', { class: 'top-icons' },
         installBtn('btn btn-lime btn-sm install-top'),
         h('a', { href: '#agendamentos', class: 'circle', 'aria-label': pendingCount ? pendingCount + ' agendamentos novos' : 'Agendamentos', title: 'Agendamentos' }, icon(IC.bell, 19), pendingCount ? h('span', { class: 'dot' }) : null),
-        h('a', { href: '#conta', class: 'user', 'aria-label': 'Minha conta' }, h('span', { class: 'avatar', 'aria-hidden': 'true' }, initialsOf(S.me.owner_name || S.me.business_name)), h('span', { class: 'nm' }, (S.me.owner_name || '').split(' ')[0]))));
+        h('a', { href: '#conta', class: 'user', 'aria-label': 'Minha conta' }, avatarBox(S.me.avatar, initialsOf(S.me.owner_name || S.me.business_name), 'avatar'), h('span', { class: 'nm' }, (S.me.owner_name || '').split(' ')[0]))));
     const side = h('nav', { class: 'side', 'aria-label': 'Menu do painel' },
       NAV.map(([id, label, ic]) => h('a', { href: '#' + id, class: 'navi', 'aria-label': label, 'aria-current': S.page === id ? 'page' : null }, icon(ic, 20), h('span', { class: 'lbl', 'aria-hidden': 'true' }, label), id === 'agendamentos' && pendingCount ? h('span', { class: 'count', 'aria-label': pendingCount + ' novos' }, pendingCount) : null)),
       h('div', { class: 'side-foot' },
@@ -229,7 +233,7 @@
     $app.replaceChildren(h('div', { class: 'app' }, top, side, main));
   }
 
-  async function logout() { await api('/api/logout', { method: 'POST' }).catch(() => {}); location.href = '/entrar'; }
+  async function logout() { await api('/api/logout', { method: 'POST' }).catch(() => {}); location.href = '/'; }
 
   function topline(title, sub, ...right) {
     return h('div', { class: 'topline' }, h('div', {}, h('h1', {}, title), sub ? h('p', { class: 'sub' }, sub) : null), h('div', { class: 'topright' }, ...right));
@@ -344,7 +348,7 @@
       const tot = P.pages.reduce((a, x) => ({ v: a.v + x.views, c: a.c + x.clicks, b: a.b + x.bookings_period }), { v: 0, c: 0, b: 0 });
       const card = (x) => h('div', { class: 'pg-card notch' + (x.id === P.current ? ' cur' : '') },
         h('button', { type: 'button', class: 'nb', onclick: () => { if (x.id !== P.current) switchPage(x.id); }, 'aria-label': (x.id === P.current ? 'Página atual: ' : 'Abrir ') + x.business_name },
-          h('span', { class: 'av' + (x.id === P.current ? ' dark' : ''), 'aria-hidden': 'true' }, initialsOf(x.business_name)),
+          avatarBox(x.avatar, initialsOf(x.business_name), 'av' + (x.id === P.current ? ' dark' : '')),
           h('b', { class: 'pg-name' }, x.business_name), h('small', { class: 'pg-slug' }, x.slug + (x.id === P.current ? ' · aberta agora' : '')),
           h('span', { class: 'pg-nums' }, h('span', {}, h('b', {}, x.views), 'visitas'), h('span', {}, h('b', {}, x.clicks), 'cliques'), h('span', {}, h('b', {}, x.bookings_period), 'agend.')),
           x.pending ? h('span', { class: 'pg-pend' }, `${x.pending} pedido${x.pending > 1 ? 's' : ''} novo${x.pending > 1 ? 's' : ''}`) : null),
@@ -821,6 +825,21 @@
       h('div', { class: 'slug-row' }, slugIn, root ? h('span', { class: 'slug-sfx' }, '.' + root) : null),
       h('span', { id: 'c_slug_prev', class: 'url-prev' }, 'Sua página: ', slugPrev), slugMsg,
       h('small', {}, `Para entrar no painel, use seu telefone, e-mail ou o nome do link (${me.username}).`));
+    // Foto de perfil desta página + sair da conta
+    const avImg = h('span', { class: 'prof-pic' });
+    const paint = (src) => avImg.replaceChildren(src ? h('img', { src, alt: 'Foto de perfil' }) : initialsOf(me.business_name));
+    paint(me.avatar);
+    const setAvatar = async (src) => {
+      try { await api('/api/me/avatar', { method: 'PUT', body: JSON.stringify({ src }) }); await loadMe(); await loadPages(); toast('Foto atualizada.'); route(true); }
+      catch (e2) { toast(e2.message || 'Não foi possível trocar a foto.', true); }
+    };
+    const prof = h('div', { class: 'card prof-card' }, avImg,
+      h('div', { class: 'prof-t' }, h('b', {}, me.business_name), h('small', { class: 'muted' }, me.avatar_custom ? 'Foto escolhida por você.' : me.avatar ? 'Usando a foto da capa da página.' : 'Ainda sem foto: envie uma em Mídia ou na capa.'),
+        h('div', { class: 'prof-btns' },
+          h('button', { type: 'button', class: 'btn btn-lime btn-sm', onclick: async () => { const r = await pickMedia({ kind: 'image' }); const v = Array.isArray(r) ? r[0] : r; const src = v && (typeof v === 'string' ? v : v.url || v.src); if (src) setAvatar(src); } }, 'Trocar foto'),
+          me.avatar_custom ? h('button', { type: 'button', class: 'btn btn-line btn-sm', onclick: () => setAvatar('') }, 'Usar foto da capa') : null)),
+      h('button', { type: 'button', class: 'btn btn-line btn-sm prof-out', onclick: logout }, icon(IC.out, 16), 'Sair da conta'));
+    box.append(prof);
     const form = h('form', { class: 'card', style: 'display:flex;flex-direction:column;gap:14px;margin-bottom:16px' },
       h('h2', {}, 'Seus dados'),
       h('div', { class: 'formgrid' }, F('business_name', 'Nome do negócio', me.business_name), F('owner_name', 'Seu nome', me.owner_name), F('email', 'E-mail', me.email, { type: 'email' }), F('whatsapp', 'WhatsApp', phoneFmt(me.whatsapp), { inputmode: 'tel' }), h('div', { class: 'f' }, h('label', { for: 'c_segment' }, 'Segmento'), segSel),
